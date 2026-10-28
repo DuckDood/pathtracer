@@ -18,6 +18,7 @@ typedef struct {
 	vec3 position;
 	float radius;
 	vec3 color;
+	vec3 emit;
 } sphere;
 
 

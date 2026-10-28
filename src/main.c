@@ -91,23 +91,57 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	}
 }
 
+vec3 environment(vec3 direction) {
+	return (vec3){0.6, 0.6, 0.8};
+}
+
+vec3 rand_vec() {
+	vec3 vec;
+//	while(true) {
+		vec[0] = ((double)rand()/RAND_MAX - 0.5) * 2;
+		vec[1] = ((double)rand()/RAND_MAX - 0.5) * 2;
+		vec[2] = ((double)rand()/RAND_MAX - 0.5) * 2;
+		//if(v3_dot(vec, vec) <= 1) break;
+	//}
+	return v3_norm(vec);
+}
+
+vec3 random_in_hemiphere(vec3 hem) {
+	vec3 vec = rand_vec();
+	if(v3_dot(vec, hem) < 0) return -vec;
+	return vec;
+}
+
 vec3 trace(ray r, sphere *spheres, int sphere_count) {
-			float min_t = INFINITY;
-			sphere *hit_sphere = NULL;
-			vec3 normal;
-			for(int i = 0; i < sphere_count; ++i) {
-				hitinfo info = ray_sphere_intersection(r, spheres[i]);
-				if(!info.hit) continue;
-				if(info.distance < min_t) {
-					hit_sphere = spheres + i;
-					min_t = info.distance;
-					normal = info.normal;
-				}
+	int bounce_count = 10;
+	ray current_ray = r;
+	vec3 light = (vec3){1, 1, 1, 1};
+	vec3 in_light = (vec3){0, 0, 0, 0};
+	for(int bounce = 0; bounce < bounce_count; ++bounce) {
+		float min_t = INFINITY;
+		sphere *hit_sphere = NULL;
+		hitinfo hit_info;
+		for(int i = 0; i < sphere_count; ++i) {
+			hitinfo info = ray_sphere_intersection(current_ray, spheres[i]);
+			if(!info.hit) continue;
+			if(info.distance < min_t) {
+				hit_sphere = spheres + i;
+				min_t = info.distance;
+				hit_info = info;
 			}
-			if(min_t != INFINITY) {
-				return 0.5*(normal + 1);
-			}
-			return (vec3){0};
+		}
+		if(min_t != INFINITY) {
+			in_light += hit_sphere->emit * light;
+			light *= hit_sphere->color;
+			//return 0.5*(normal + 1);
+		} else {
+			//light *= environment(current_ray.direction);
+			break;
+		};
+		current_ray.origin = hit_info.position;
+		current_ray.direction = random_in_hemiphere(hit_info.normal);
+	}
+	return in_light;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
@@ -127,19 +161,19 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	if(kbd_state[SDL_SCANCODE_W]) {
 		//state->cam_pos[2] += 0.01;
-		state->cam_pos[0] += sin(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
-		state->cam_pos[2] += cos(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+		state->cam_pos[0] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] -= sin(state->cam_pitch) * 0.01;
+		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
 	}
 
 	if(kbd_state[SDL_SCANCODE_S]) {
 		//state->cam_pos[2] -= 0.01;
 		//
-		state->cam_pos[0] -= sin(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
-		state->cam_pos[2] -= cos(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+		state->cam_pos[0] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] += sin(state->cam_pitch) * 0.01;
+		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
 	}
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
@@ -151,10 +185,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			);*/
 
 	sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {1, 0, 0}},
-	{{1, -0.2, 4}, 0.5, {0, 1, 0}},
-	{{-1, -0.14, 2}, 0.3, {0, 0, 1}},
-	{{-1, 100, 2}, 100, {0, 1, 1}},
+	{{0, -0.4, 3}, 1, {0, 0, 0}, {1, 1, 1}},
+	{{1, -0.2, 4}, 0.5, {0, 1, 0}, {0}},
+	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
+	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
 	};
 	int sphere_count = 4;
 
