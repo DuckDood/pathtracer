@@ -5,11 +5,15 @@ compiler gcc
 srcflag ${CFLAGS}
 buildflag ${LDFLAGS}
 
+srcflag -fopenmp
+buildflag -fopenmp
+
 buildflag -lSDL3
 srcflag -Iinclude
 
 src main.c
 src vectors.c
+src transformations.c
 
 build pathtrace
 

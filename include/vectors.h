@@ -1,3 +1,4 @@
+#pragma once
 typedef float vec3 __attribute__((vector_size(4 * sizeof(float))));
 
 typedef float vec4 __attribute__((vector_size(4 * sizeof(float))));
