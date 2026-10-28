@@ -12,6 +12,10 @@ float v3_len(vec3 a) {
 	return sqrt(v3_dot(a,a));
 }
 
+vec3 v3_norm(vec3 a) {
+	return a/(float)sqrt(v3_dot(a,a));
+}
+
 vec4 v3_to_4(vec3 a) {
 	a[3] = 0;
 	return a;

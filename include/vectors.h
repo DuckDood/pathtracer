@@ -11,6 +11,8 @@ typedef struct {
 float v3_dot(vec3 a, vec3 b);
 float v3_len(vec3 a);
 
+vec3 v3_norm(vec3 a);
+
 vec4 v3_to_4(vec3 a);
 
 mat4 m4_m4_mul(mat4 a, mat4 b);

@@ -7,10 +7,18 @@ typedef struct {
 } ray;
 
 typedef struct {
+	vec3 normal;
+	vec3 position;
+	float distance;
+	_Bool hit;
+} hitinfo;
+
+
+typedef struct {
 	vec3 position;
 	float radius;
 	vec3 color;
 } sphere;
 
 
-float ray_sphere_intersection(ray r, sphere s);
+hitinfo ray_sphere_intersection(ray r, sphere s);

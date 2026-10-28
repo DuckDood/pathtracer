@@ -94,16 +94,18 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 vec3 trace(ray r, sphere *spheres, int sphere_count) {
 			float min_t = INFINITY;
 			sphere *hit_sphere = NULL;
+			vec3 normal;
 			for(int i = 0; i < sphere_count; ++i) {
-				float t = ray_sphere_intersection(r, spheres[i]);
-				if(t <= 0) continue;
-				if(t < min_t) {
+				hitinfo info = ray_sphere_intersection(r, spheres[i]);
+				if(!info.hit) continue;
+				if(info.distance < min_t) {
 					hit_sphere = spheres + i;
-					min_t = t;
+					min_t = info.distance;
+					normal = info.normal;
 				}
 			}
 			if(min_t != INFINITY) {
-				return hit_sphere->color;
+				return 0.5*(normal + 1);
 			}
 			return (vec3){0};
 }
@@ -139,7 +141,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 		state->cam_pos[1] += sin(state->cam_pitch) * 0.01;
 	}
-	printf("positoinz: %f, rot %f\n", state->cam_pos[2], state->cam_yaw);
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
 	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
