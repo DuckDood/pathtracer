@@ -1,0 +1,21 @@
+dir obj
+dir build
+
+compiler gcc
+srcflag ${CFLAGS}
+buildflag ${LDFLAGS}
+
+buildflag -lSDL3
+srcflag -Iinclude
+
+src main.c
+src vectors.c
+
+build pathtrace
+
+embedmake
+clean:
+	rm -r obj
+	rm -r build
+.PHONY: clean
+endmake
