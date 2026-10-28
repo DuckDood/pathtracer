@@ -6,4 +6,11 @@ typedef struct {
 	vec3 direction;
 } ray;
 
-float ray_sphere_intersection(ray r, vec3 circ_center, float circ_rad);
+typedef struct {
+	vec3 position;
+	float radius;
+	vec3 color;
+} sphere;
+
+
+float ray_sphere_intersection(ray r, sphere s);

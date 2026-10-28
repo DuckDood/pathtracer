@@ -91,6 +91,23 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	}
 }
 
+vec3 trace(ray r, sphere *spheres, int sphere_count) {
+			float min_t = INFINITY;
+			sphere *hit_sphere = NULL;
+			for(int i = 0; i < sphere_count; ++i) {
+				float t = ray_sphere_intersection(r, spheres[i]);
+				if(t <= 0) continue;
+				if(t < min_t) {
+					hit_sphere = spheres + i;
+					min_t = t;
+				}
+			}
+			if(min_t != INFINITY) {
+				return hit_sphere->color;
+			}
+			return (vec3){0};
+}
+
 SDL_AppResult SDL_AppIterate(void *appstate) {
 	struct program_state *state = (struct program_state*)appstate;
 	SDL_Surface *win_orig_surface = SDL_GetWindowSurface(state->window);
@@ -102,30 +119,43 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	state->pixels.pixels = win_surface->pixels;
 	state->pixels.bpp = SDL_BYTESPERPIXEL(win_surface->format);
 
+	float aspect_ratio = (float)state->pixels.width / state->pixels.height;
+
 	const _Bool * const kbd_state = SDL_GetKeyboardState(NULL);
 
 	if(kbd_state[SDL_SCANCODE_W]) {
 		//state->cam_pos[2] += 0.01;
-		state->cam_pos[2] += cos(state->cam_yaw)* 0.01;
-		//state->cam_pos[2] += cos(state->cam_yaw)* 0.01;
+		state->cam_pos[0] += sin(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+		state->cam_pos[2] += cos(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+
+		state->cam_pos[1] -= sin(state->cam_pitch) * 0.01;
 	}
 
 	if(kbd_state[SDL_SCANCODE_S]) {
 		//state->cam_pos[2] -= 0.01;
 		//
-		//state->cam_pos[0] += sin(state->cam_yaw)* 0.01;
-		state->cam_pos[2] -= cos(state->cam_yaw)* 0.01;
+		state->cam_pos[0] -= sin(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+		state->cam_pos[2] -= cos(state->cam_yaw)* 0.01 * cos(state->cam_pitch);
+
+		state->cam_pos[1] += sin(state->cam_pitch) * 0.01;
 	}
 	printf("positoinz: %f, rot %f\n", state->cam_pos[2], state->cam_yaw);
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
-	mat4 cam_matrix = m4_m4_mul(gen_translation_matrix(state->cam_pos), rot_matrix);
 	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
 			cam_matrix.columns[0][0],cam_matrix.columns[1][0],cam_matrix.columns[2][0],cam_matrix.columns[3][0],
 			cam_matrix.columns[0][1],cam_matrix.columns[1][1],cam_matrix.columns[2][1],cam_matrix.columns[3][1],
 			cam_matrix.columns[0][2],cam_matrix.columns[1][2],cam_matrix.columns[2][2],cam_matrix.columns[3][2],
 			cam_matrix.columns[0][3],cam_matrix.columns[1][3],cam_matrix.columns[2][3],cam_matrix.columns[3][3]
 			);*/
+
+	sphere spheres[4] = {
+	{{0, -0.4, 3}, 1, {1, 0, 0}},
+	{{1, -0.2, 4}, 0.5, {0, 1, 0}},
+	{{-1, -0.14, 2}, 0.3, {0, 0, 1}},
+	{{-1, 100, 2}, 100, {0, 1, 1}},
+	};
+	int sphere_count = 4;
 
 #pragma omp parallel for
 	for(int y = 0; y < state->pixels.height; ++y) {
@@ -134,15 +164,36 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
 			ray cam_ray;
 			cam_ray.origin = state->cam_pos;
-			cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x, ndc_y, 1, 1});
+			cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio, ndc_y, 1, 1});
 			cam_ray.direction /= v3_len(cam_ray.direction);
 
 			vec4 color = (vec4){0};
 
-			float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 0.1);
-			if(t > 0) {
-				color[0] = 1;
+			color = trace(cam_ray, spheres, sphere_count);
+			/*float min_t = INFINITY;
+			sphere *hit_sphere = NULL;
+			for(int i = 0; i < sphere_count; ++i) {
+				float t = ray_sphere_intersection(cam_ray, spheres[i]);
+				if(t <= 0) continue;
+				if(t < min_t) {
+					hit_sphere = spheres + i;
+					min_t = t;
+				}
 			}
+			if(min_t != INFINITY) {
+				color = hit_sphere->color;
+			}*/
+			/*if(hit_sphere == NULL) {
+				printf("hi\n");
+			}*/
+			//float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 1);
+			//float t = ray_sphere_intersection(cam_ray, (vec3){1, 0, 2}, 0.5);
+			/*float t = ray_sphere_intersection(cam_ray, spheres[0]);
+			if(t > 0) {
+				vec3 normal = cam_ray.direction * t - (vec3){0, 0, 3} + cam_ray.origin;
+				color = (normal + 1) * 0.5;
+				//color[0] = 1;
+			}*/
 			//}	color[0] = 1;
 
 			color[3] = 1;
