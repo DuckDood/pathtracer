@@ -1,0 +1,6 @@
+# binaries and stuff
+obj/
+build/
+
+# clangd stuff
+compile_commands.json
