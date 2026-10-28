@@ -25,3 +25,28 @@ mat4 gen_rotation_matrix(float yaw, float pitch, float roll) {
 		});
 
 }
+
+mat4 gen_translation_matrix(vec3 pos) {
+	return construct_mat4_cm((float[16]){
+		1,
+		0,
+		0,
+		0,
+
+		0,
+		1,
+		0,
+		0,
+
+		0,
+		0,
+		1,
+		0,
+
+		pos[0],
+		pos[1],
+		pos[2],
+		1
+		});
+
+}

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <vectors.h>
 #include <transformations.h>
+#include <ray.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -26,6 +27,7 @@ struct program_state {
 
 	float cam_yaw;
 	float cam_pitch;
+	vec3 cam_pos;
 };
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -42,6 +44,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 		fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
+	SDL_SetWindowRelativeMouseMode(state->window, true);
+
 
 	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
 			x.columns[0][0],x.columns[1][0],x.columns[2][0],x.columns[3][0],
@@ -51,6 +55,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 			);*/
 	state->cam_yaw = 0;
 	state->cam_pitch = 0;
+	state->cam_pos = (vec3){0,0,0};
 
 	return SDL_APP_CONTINUE;
 }
@@ -61,9 +66,16 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 		case SDL_EVENT_QUIT:
 			return SDL_APP_SUCCESS;
 			break;
+		case SDL_EVENT_KEY_DOWN:
+			switch(event->key.key) {
+				case SDLK_P:
+					SDL_SavePNG(SDL_GetWindowSurface(state->window), "screenshot.png");
+					break;
+			}
+			break;
 		case SDL_EVENT_MOUSE_MOTION:
-			state->cam_yaw += event->motion.xrel / 100;
-			state->cam_pitch -= event->motion.yrel / 100;
+			state->cam_yaw += event->motion.xrel / state->pixels.height;
+			state->cam_pitch -= event->motion.yrel / state->pixels.height;
 			state->cam_pitch = fmax(state->cam_pitch, -M_PI/2);
 			state->cam_pitch = fmin(state->cam_pitch, M_PI/2);
 			break;
@@ -90,19 +102,50 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	state->pixels.pixels = win_surface->pixels;
 	state->pixels.bpp = SDL_BYTESPERPIXEL(win_surface->format);
 
-	//memset(state->pixels.pixels, 0, state->pixels.pitch * state->pixels.height);
+	const _Bool * const kbd_state = SDL_GetKeyboardState(NULL);
+
+	if(kbd_state[SDL_SCANCODE_W]) {
+		//state->cam_pos[2] += 0.01;
+		state->cam_pos[2] += cos(state->cam_yaw)* 0.01;
+		//state->cam_pos[2] += cos(state->cam_yaw)* 0.01;
+	}
+
+	if(kbd_state[SDL_SCANCODE_S]) {
+		//state->cam_pos[2] -= 0.01;
+		//
+		//state->cam_pos[0] += sin(state->cam_yaw)* 0.01;
+		state->cam_pos[2] -= cos(state->cam_yaw)* 0.01;
+	}
+	printf("positoinz: %f, rot %f\n", state->cam_pos[2], state->cam_yaw);
+
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
+	mat4 cam_matrix = m4_m4_mul(gen_translation_matrix(state->cam_pos), rot_matrix);
+	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
+			cam_matrix.columns[0][0],cam_matrix.columns[1][0],cam_matrix.columns[2][0],cam_matrix.columns[3][0],
+			cam_matrix.columns[0][1],cam_matrix.columns[1][1],cam_matrix.columns[2][1],cam_matrix.columns[3][1],
+			cam_matrix.columns[0][2],cam_matrix.columns[1][2],cam_matrix.columns[2][2],cam_matrix.columns[3][2],
+			cam_matrix.columns[0][3],cam_matrix.columns[1][3],cam_matrix.columns[2][3],cam_matrix.columns[3][3]
+			);*/
 
 #pragma omp parallel for
 	for(int y = 0; y < state->pixels.height; ++y) {
 		for(int x = 0; x < state->pixels.width; ++x) {
 			float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
 			float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
-			vec4 ray_dir = m4_v4_mul(rot_matrix, (vec4){ndc_x, ndc_y, 1, 0});
+			ray cam_ray;
+			cam_ray.origin = state->cam_pos;
+			cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x, ndc_y, 1, 1});
+			cam_ray.direction /= v3_len(cam_ray.direction);
 
-			vec4 color = ray_dir;
+			vec4 color = (vec4){0};
+
+			float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 0.1);
+			if(t > 0) {
+				color[0] = 1;
+			}
+			//}	color[0] = 1;
+
 			color[3] = 1;
-
 
 			color[0] = fmax(0, color[0]);
 			color[1] = fmax(0, color[1]);
