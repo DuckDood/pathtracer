@@ -15,16 +15,16 @@
 #define HEIGHT 600
 
 typedef struct {
-	int width, height, pitch;
-	int bpp;
-	uint8_t *pixels;
-} pixel_array;
+	int width, height;
+	vec4 *pixels;
+} screen;
 
 
 struct program_state {
 	SDL_Window *window;
-	pixel_array pixels;
+	screen pixels;
 
+	int frame_accumulation_count;
 	float cam_yaw;
 	float cam_pitch;
 	vec3 cam_pos;
@@ -57,6 +57,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	state->cam_pitch = 0;
 	state->cam_pos = (vec3){0,0,0};
 
+	SDL_Surface *win_surface = SDL_GetWindowSurface(state->window);
+
+	state->pixels.width = win_surface->w;
+	state->pixels.height = win_surface->h;
+	state->pixels.pixels = malloc(state->pixels.width * state->pixels.height * sizeof(vec4));
+
+	state->frame_accumulation_count = 0;
+
+
 	return SDL_APP_CONTINUE;
 }
 
@@ -78,6 +87,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 			state->cam_pitch -= event->motion.yrel / state->pixels.height;
 			state->cam_pitch = fmax(state->cam_pitch, -M_PI/2);
 			state->cam_pitch = fmin(state->cam_pitch, M_PI/2);
+
+			state->frame_accumulation_count = 0;
 			break;
 	}
 
@@ -115,8 +126,8 @@ vec3 random_in_hemiphere(vec3 hem) {
 vec3 trace(ray r, sphere *spheres, int sphere_count) {
 	int bounce_count = 4;
 	ray current_ray = r;
-	vec3 light = (vec3){1, 1, 1, 1};
-	vec3 in_light = (vec3){0, 0, 0, 0};
+	vec3 ray_color = (vec3){1, 1, 1, 1};
+	vec3 incoming_light = (vec3){0, 0, 0, 0};
 	for(int bounce = 0; bounce < bounce_count; ++bounce) {
 		float min_t = INFINITY;
 		sphere *hit_sphere = NULL;
@@ -131,8 +142,9 @@ vec3 trace(ray r, sphere *spheres, int sphere_count) {
 			}
 		}
 		if(min_t != INFINITY) {
-			in_light += hit_sphere->emit * light;
-			light *= hit_sphere->color;
+			vec3 emitted_light = hit_sphere->emit;
+			incoming_light += emitted_light * ray_color;
+			ray_color *= hit_sphere->color;
 			//return 0.5*(normal + 1);
 		} else {
 			//light *= environment(current_ray.direction);
@@ -141,7 +153,7 @@ vec3 trace(ray r, sphere *spheres, int sphere_count) {
 		current_ray.origin = hit_info.position;
 		current_ray.direction = random_in_hemiphere(hit_info.normal);
 	}
-	return in_light;
+	return incoming_light;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
@@ -149,11 +161,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	SDL_Surface *win_orig_surface = SDL_GetWindowSurface(state->window);
 	SDL_Surface *win_surface = SDL_ConvertSurface(win_orig_surface, SDL_PIXELFORMAT_ABGR8888);
 
-	state->pixels.width = win_surface->w;
-	state->pixels.height = win_surface->h;
-	state->pixels.pitch = win_surface->pitch;
-	state->pixels.pixels = win_surface->pixels;
-	state->pixels.bpp = SDL_BYTESPERPIXEL(win_surface->format);
 
 	float aspect_ratio = (float)state->pixels.width / state->pixels.height;
 
@@ -165,6 +172,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
 		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
+
+		state->frame_accumulation_count = 0;
 	}
 
 	if(kbd_state[SDL_SCANCODE_S]) {
@@ -174,6 +183,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
 		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
+		state->frame_accumulation_count = 0;
 	}
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
@@ -185,14 +195,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			);*/
 
 	sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {0, 0, 0}, {1, 1, 1}},
-	{{1, -0.2, 4}, 0.5, {0, 1, 0}, {0}},
+	{{0, -0.4, 3}, 1, {0, 0, 0}, {3, 3, 3}},
+	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
 	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
 	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
 	};
 	int sphere_count = 4;
 
-#pragma omp parallel for
 	for(int y = 0; y < state->pixels.height; ++y) {
 		for(int x = 0; x < state->pixels.width; ++x) {
 			float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
@@ -233,23 +242,29 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 			color[3] = 1;
 
-			color[0] = fmax(0, color[0]);
-			color[1] = fmax(0, color[1]);
-			color[2] = fmax(0, color[2]);
-			color[3] = fmax(0, color[3]);
 
-			color[0] = fmin(1, color[0]);
-			color[1] = fmin(1, color[1]);
-			color[2] = fmin(1, color[2]);
-			color[3] = fmin(1, color[3]);
+			state->pixels.pixels[y * state->pixels.width + x] *= (float)state->frame_accumulation_count;
+			state->pixels.pixels[y * state->pixels.width + x] += color;
+			state->pixels.pixels[y * state->pixels.width + x] /= (float)state->frame_accumulation_count+1;
+			vec4 pix_color = state->pixels.pixels[y * state->pixels.width + x];
+			pix_color[0] = fmax(0, pix_color[0]);
+			pix_color[1] = fmax(0, pix_color[1]);
+			pix_color[2] = fmax(0, pix_color[2]);
+			pix_color[3] = fmax(0, pix_color[3]);
+
+			pix_color[0] = fmin(1, pix_color[0]);
+			pix_color[1] = fmin(1, pix_color[1]);
+			pix_color[2] = fmin(1, pix_color[2]);
+			pix_color[3] = fmin(1, pix_color[3]);
 
 			// assuming little endian (i think maybe sdl accounts for it with pixelformats?)
-			state->pixels.pixels[y * state->pixels.pitch + x*state->pixels.bpp + 0] = color[0] * 255;
-			state->pixels.pixels[y * state->pixels.pitch + x*state->pixels.bpp + 1] = color[1] * 255;
-			state->pixels.pixels[y * state->pixels.pitch + x*state->pixels.bpp + 2] = color[2] * 255;
-			state->pixels.pixels[y * state->pixels.pitch + x*state->pixels.bpp + 3] = color[3] * 255;
+			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 0] = pix_color[0] * 255;
+			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 1] = pix_color[1] * 255;
+			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 2] = pix_color[2] * 255;
+			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 3] = pix_color[3] * 255;
 		}
 	}
+	state->frame_accumulation_count++;
 
 	SDL_BlitSurface(win_surface, NULL, win_orig_surface, NULL);
 	SDL_UpdateWindowSurface(state->window);
