@@ -5,6 +5,8 @@ compiler gcc
 srcflag ${CFLAGS}
 buildflag ${LDFLAGS}
 
+srcflag -O3
+
 srcflag -fopenmp
 buildflag -fopenmp
 

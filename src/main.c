@@ -97,12 +97,12 @@ vec3 environment(vec3 direction) {
 
 vec3 rand_vec() {
 	vec3 vec;
-//	while(true) {
+	while(true) {
 		vec[0] = ((double)rand()/RAND_MAX - 0.5) * 2;
 		vec[1] = ((double)rand()/RAND_MAX - 0.5) * 2;
 		vec[2] = ((double)rand()/RAND_MAX - 0.5) * 2;
-		//if(v3_dot(vec, vec) <= 1) break;
-	//}
+		if(v3_dot(vec, vec) <= 1) break;
+	}
 	return v3_norm(vec);
 }
 
@@ -113,7 +113,7 @@ vec3 random_in_hemiphere(vec3 hem) {
 }
 
 vec3 trace(ray r, sphere *spheres, int sphere_count) {
-	int bounce_count = 10;
+	int bounce_count = 4;
 	ray current_ray = r;
 	vec3 light = (vec3){1, 1, 1, 1};
 	vec3 in_light = (vec3){0, 0, 0, 0};
