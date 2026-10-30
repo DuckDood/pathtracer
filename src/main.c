@@ -185,12 +185,13 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 		};
 		current_ray.origin = hit_info.position;
 		//current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		if(hit_sphere == spheres || hit_sphere == spheres + 1) {
-			current_ray.direction = current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal;
-		} else {
+		//if(hit_sphere == spheres || hit_sphere == spheres + 1) {
+			//current_ray.direction = current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal;
+		//} else {
 			current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		}
+		//}
 	}
+	incoming_light[3] = 1;
 	return incoming_light;
 }
 
@@ -248,14 +249,30 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		const int y = i / state->pixels.width;
 		float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
 		float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
-		ray cam_ray;
-		cam_ray.origin = state->cam_pos;
-		cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio, ndc_y, 1, 1});
-		cam_ray.direction /= v3_len(cam_ray.direction);
 
-		vec4 color = (vec4){0};
+		float aa = 1;
+		float x_halfpix = 0.5/state->pixels.width * aa;
+		float y_halfpix = 0.5/state->pixels.height * aa;
 
-		color = trace(cam_ray, spheres, sphere_count, &rng_seed);
+		ray cam_rays[4];
+		cam_rays[0].origin = state->cam_pos;
+		cam_rays[0].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio + x_halfpix, ndc_y, 1, 1}));
+
+		cam_rays[1].origin = state->cam_pos;
+		cam_rays[1].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio - x_halfpix, ndc_y, 1, 1}));
+
+		cam_rays[2].origin = state->cam_pos;
+		cam_rays[2].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio + y_halfpix, ndc_y, 1, 1}));
+
+		cam_rays[3].origin = state->cam_pos;
+		cam_rays[3].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio - y_halfpix, ndc_y, 1, 1}));
+
+		vec4 colors[4];
+
+		colors[0] = trace(cam_rays[0], spheres, sphere_count, &rng_seed);
+		colors[1] = trace(cam_rays[1], spheres, sphere_count, &rng_seed);
+		colors[2] = trace(cam_rays[2], spheres, sphere_count, &rng_seed);
+		colors[3] = trace(cam_rays[3], spheres, sphere_count, &rng_seed);
 		/*float min_t = INFINITY;
 		  sphere *hit_sphere = NULL;
 		  for(int i = 0; i < sphere_count; ++i) {
@@ -282,7 +299,12 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		}*/
 		//}	color[0] = 1;
 
-		color[3] = 1;
+		colors[0][3] = 1;
+		colors[1][3] = 1;
+		colors[2][3] = 1;
+		colors[3][3] = 1;
+
+		vec4 color = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
 
 
 		state->pixels.pixels[y * state->pixels.width + x] *= (float)state->frame_accumulation_count;
