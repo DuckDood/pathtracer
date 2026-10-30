@@ -79,6 +79,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 			switch(event->key.key) {
 				case SDLK_P:
 					SDL_SavePNG(SDL_GetWindowSurface(state->window), "screenshot.png");
+
+				case SDLK_C:
+					printf("{%f, %f, %f}, %f, %f", state->cam_pos[0], state->cam_pos[1], state->cam_pos[2], state->cam_yaw, state->cam_pitch);
 					break;
 			}
 			break;
@@ -123,6 +126,19 @@ vec3 random_in_hemiphere(vec3 hem) {
 	return vec;
 }
 
+vec3 sample_env_light(vec3 direction) {
+	vec3 ground_col = {0.2, 0.2, 0.2};
+	vec3 sky_col = (vec3){0.8, 0.8, 1} * 0.8f;
+	vec3 ground = ground_col * (float)(direction[1] > 0);
+	vec3 sky = sky_col * (float)!(direction[1] > 0);
+
+	vec3 sun_dir = v3_norm((vec3){-1, -1, -0.2});
+
+	float sun = pow(v3_dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
+
+	return ground + sky + sun;
+}
+
 vec3 trace(ray r, sphere *spheres, int sphere_count) {
 	int bounce_count = 4;
 	ray current_ray = r;
@@ -148,6 +164,7 @@ vec3 trace(ray r, sphere *spheres, int sphere_count) {
 			//return 0.5*(normal + 1);
 		} else {
 			//light *= environment(current_ray.direction);
+			incoming_light += sample_env_light(current_ray.direction) * ray_color;
 			break;
 		};
 		current_ray.origin = hit_info.position;
@@ -195,7 +212,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			);*/
 
 	sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {0, 0, 0}, {3, 3, 3}},
+	{{0, -0.4, 3}, 1, {1, 0, 0}, {0}},
 	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
 	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
 	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
