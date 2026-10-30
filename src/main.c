@@ -144,6 +144,7 @@ vec3 rand_vec(uint *rng_seed) {
 vec3 sample_env_light(vec3 direction) {
 	vec3 ground_col = {0.2, 0.2, 0.2};
 	vec3 sky_col = (vec3){0.8, 0.8, 1} * 0.8f;
+	sky_col += sky_col * (1-(float)fmin(1-direction[1], 2) / 2) * 1.f;
 	vec3 ground = ground_col * (float)(direction[1] > 0);
 	vec3 sky = sky_col * (float)!(direction[1] > 0);
 
