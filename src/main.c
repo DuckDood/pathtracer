@@ -109,22 +109,44 @@ vec3 environment(vec3 direction) {
 	return (vec3){0.6, 0.6, 0.8};
 }
 
-vec3 rand_vec() {
+// found in https://youtu.be/Qz0KTGYJtUk?t=672 (Sebastian Lague's ray tracing video) 
+float hash(uint *rng_seed) {
+	uint state = *rng_seed;
+	state *= state * 747796405 + 2891336453;
+	uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+	result = (result >> 22) ^ result;
+	*rng_seed = state;
+	return result / 4294967295.0;
+}
+
+vec3 rand_vec(uint *rng_seed) {
 	vec3 vec;
+	int count = 0;
 	while(true) {
-		vec[0] = ((double)rand()/RAND_MAX - 0.5) * 2;
+	/*	if(count > 20) printf(
+				"%f, %f, %f\n", hash(rng_seed), hash(rng_seed), hash(rng_seed)
+				);*/
+		/*vec[0] = ((double)rand()/RAND_MAX - 0.5) * 2;
 		vec[1] = ((double)rand()/RAND_MAX - 0.5) * 2;
-		vec[2] = ((double)rand()/RAND_MAX - 0.5) * 2;
+		vec[2] = ((double)rand()/RAND_MAX - 0.5) * 2;*/
+
+		vec[0] = hash(rng_seed) * 2 - 1;
+		vec[1] = hash(rng_seed) * 2 - 1;
+		vec[2] = hash(rng_seed) * 2 - 1;
+		//vec[0] = ((double)rand() / RAND_MAX) * 2 - 1;
+		//vec[1] = ((double)rand() / RAND_MAX) * 2 - 1;
+		//vec[2] = ((double)rand() / RAND_MAX) * 2 - 1;
 		if(v3_dot(vec, vec) <= 1) break;
+		count++;
 	}
 	return v3_norm(vec);
 }
 
-vec3 random_in_hemiphere(vec3 hem) {
+/*vec3 random_in_hemiphere(vec3 hem) {
 	vec3 vec = rand_vec();
 	if(v3_dot(vec, hem) < 0) return -vec;
 	return vec;
-}
+}*/
 
 vec3 sample_env_light(vec3 direction) {
 	vec3 ground_col = {0.2, 0.2, 0.2};
@@ -139,14 +161,14 @@ vec3 sample_env_light(vec3 direction) {
 	return ground + sky + sun;
 }
 
-vec3 trace(ray r, sphere *spheres, int sphere_count) {
+vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 	int bounce_count = 4;
 	ray current_ray = r;
 	vec3 ray_color = (vec3){1, 1, 1, 1};
 	vec3 incoming_light = (vec3){0, 0, 0, 0};
 	for(int bounce = 0; bounce < bounce_count; ++bounce) {
 		float min_t = INFINITY;
-		sphere *hit_sphere = NULL;
+		const sphere *hit_sphere = NULL;
 		hitinfo hit_info;
 		for(int i = 0; i < sphere_count; ++i) {
 			hitinfo info = ray_sphere_intersection(current_ray, spheres[i]);
@@ -168,7 +190,7 @@ vec3 trace(ray r, sphere *spheres, int sphere_count) {
 			break;
 		};
 		current_ray.origin = hit_info.position;
-		current_ray.direction = v3_norm(rand_vec() + hit_info.normal);
+		current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
 	}
 	return incoming_light;
 }
@@ -211,75 +233,81 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			cam_matrix.columns[0][3],cam_matrix.columns[1][3],cam_matrix.columns[2][3],cam_matrix.columns[3][3]
 			);*/
 
-	sphere spheres[4] = {
+	const sphere spheres[4] = {
 	{{0, -0.4, 3}, 1, {1, 0, 0}, {0}},
 	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
 	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
 	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
 	};
-	int sphere_count = 4;
+	const int sphere_count = 4;
 
-	for(int y = 0; y < state->pixels.height; ++y) {
-		for(int x = 0; x < state->pixels.width; ++x) {
-			float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
-			float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
-			ray cam_ray;
-			cam_ray.origin = state->cam_pos;
-			cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio, ndc_y, 1, 1});
-			cam_ray.direction /= v3_len(cam_ray.direction);
+#pragma omp parallel for
+	for(int i = 0; i < state->pixels.height * state->pixels.width; ++i) {
+		//for(int x = 0; x < state->pixels.width; ++x) {
+		uint rng_seed = i + state->frame_accumulation_count * 2304894;
+		const int x = i % state->pixels.width;
+		const int y = i / state->pixels.width;
+		float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
+		float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
+		ray cam_ray;
+		cam_ray.origin = state->cam_pos;
+		cam_ray.direction = m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio, ndc_y, 1, 1});
+		cam_ray.direction /= v3_len(cam_ray.direction);
 
-			vec4 color = (vec4){0};
+		vec4 color = (vec4){0};
 
-			color = trace(cam_ray, spheres, sphere_count);
-			/*float min_t = INFINITY;
-			sphere *hit_sphere = NULL;
-			for(int i = 0; i < sphere_count; ++i) {
-				float t = ray_sphere_intersection(cam_ray, spheres[i]);
-				if(t <= 0) continue;
-				if(t < min_t) {
-					hit_sphere = spheres + i;
-					min_t = t;
-				}
-			}
-			if(min_t != INFINITY) {
-				color = hit_sphere->color;
-			}*/
-			/*if(hit_sphere == NULL) {
-				printf("hi\n");
-			}*/
-			//float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 1);
-			//float t = ray_sphere_intersection(cam_ray, (vec3){1, 0, 2}, 0.5);
-			/*float t = ray_sphere_intersection(cam_ray, spheres[0]);
-			if(t > 0) {
-				vec3 normal = cam_ray.direction * t - (vec3){0, 0, 3} + cam_ray.origin;
-				color = (normal + 1) * 0.5;
-				//color[0] = 1;
-			}*/
-			//}	color[0] = 1;
+		color = trace(cam_ray, spheres, sphere_count, &rng_seed);
+		/*float min_t = INFINITY;
+		  sphere *hit_sphere = NULL;
+		  for(int i = 0; i < sphere_count; ++i) {
+		  float t = ray_sphere_intersection(cam_ray, spheres[i]);
+		  if(t <= 0) continue;
+		  if(t < min_t) {
+		  hit_sphere = spheres + i;
+		  min_t = t;
+		  }
+		  }
+		  if(min_t != INFINITY) {
+		  color = hit_sphere->color;
+		  }*/
+		/*if(hit_sphere == NULL) {
+		  printf("hi\n");
+		  }*/
+		//float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 1);
+		//float t = ray_sphere_intersection(cam_ray, (vec3){1, 0, 2}, 0.5);
+		/*float t = ray_sphere_intersection(cam_ray, spheres[0]);
+		  if(t > 0) {
+		  vec3 normal = cam_ray.direction * t - (vec3){0, 0, 3} + cam_ray.origin;
+		  color = (normal + 1) * 0.5;
+		//color[0] = 1;
+		}*/
+		//}	color[0] = 1;
 
-			color[3] = 1;
+		color[3] = 1;
 
 
-			state->pixels.pixels[y * state->pixels.width + x] *= (float)state->frame_accumulation_count;
-			state->pixels.pixels[y * state->pixels.width + x] += color;
-			state->pixels.pixels[y * state->pixels.width + x] /= (float)state->frame_accumulation_count+1;
-			vec4 pix_color = state->pixels.pixels[y * state->pixels.width + x];
-			pix_color[0] = fmax(0, pix_color[0]);
-			pix_color[1] = fmax(0, pix_color[1]);
-			pix_color[2] = fmax(0, pix_color[2]);
-			pix_color[3] = fmax(0, pix_color[3]);
+		state->pixels.pixels[y * state->pixels.width + x] *= (float)state->frame_accumulation_count;
+		state->pixels.pixels[y * state->pixels.width + x] += color;
+		state->pixels.pixels[y * state->pixels.width + x] /= (float)state->frame_accumulation_count+1;
+		vec4 pix_color = state->pixels.pixels[y * state->pixels.width + x];
+		pix_color[0] = fmax(0, pix_color[0]);
+		pix_color[1] = fmax(0, pix_color[1]);
+		pix_color[2] = fmax(0, pix_color[2]);
+		pix_color[3] = fmax(0, pix_color[3]);
 
-			pix_color[0] = fmin(1, pix_color[0]);
-			pix_color[1] = fmin(1, pix_color[1]);
-			pix_color[2] = fmin(1, pix_color[2]);
-			pix_color[3] = fmin(1, pix_color[3]);
+		pix_color[0] = fmin(1, pix_color[0]);
+		pix_color[1] = fmin(1, pix_color[1]);
+		pix_color[2] = fmin(1, pix_color[2]);
+		pix_color[3] = fmin(1, pix_color[3]);
 
-			// assuming little endian (i think maybe sdl accounts for it with pixelformats?)
-			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 0] = pix_color[0] * 255;
-			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 1] = pix_color[1] * 255;
-			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 2] = pix_color[2] * 255;
-			((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 3] = pix_color[3] * 255;
-		}
+		//if(isnan(pix_color[0]) || isnan(pix_color[1]) || isnan(pix_color[2]))  pix_color = (vec4){0, 1, 0, 1};
+
+		// assuming little endian (i think maybe sdl accounts for it with pixelformats?)
+		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 0] = pix_color[0] * 255;
+		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 1] = pix_color[1] * 255;
+		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 2] = pix_color[2] * 255;
+		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 3] = pix_color[3] * 255;
+		//}
 	}
 	state->frame_accumulation_count++;
 
