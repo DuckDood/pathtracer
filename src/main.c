@@ -135,6 +135,12 @@ vec3 rand_vec(uint *rng_seed) {
 	return v3_norm(vec);
 }
 
+vec3 rand_in_sphere(uint *rng_seed) {
+	vec3 direction = rand_vec(rng_seed);
+
+	return direction * (float)cbrt(hash(rng_seed));
+}
+
 /*vec3 random_in_hemiphere(vec3 hem) {
 	vec3 vec = rand_vec();
 	if(v3_dot(vec, hem) < 0) return -vec;
@@ -152,6 +158,7 @@ vec3 sample_env_light(vec3 direction) {
 
 	float sun = pow(v3_dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
 
+	//return (vec3){0};
 	return ground + sky + sun;
 }
 
@@ -184,12 +191,13 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 			break;
 		};
 		current_ray.origin = hit_info.position;
-		//current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		//if(hit_sphere == spheres || hit_sphere == spheres + 1) {
-			//current_ray.direction = current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal;
-		//} else {
+		if((hit_sphere == spheres || hit_sphere == spheres + 1)) {
+			current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 0.3f);
+			//current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal);
+			//current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
+		} else {
 			current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		//}
+		}
 	}
 	incoming_light[3] = 1;
 	return incoming_light;
@@ -235,9 +243,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	const sphere spheres[4] = {
 	{{0, -0.4, 3}, 1, {1, 1, 1}, {0}},
-	{{2, -0.5, 3}, 0.5, {1, 1, 1}, {0}},
-	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
-	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
+	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
+	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0, 0, 0}},
+	{{-1, 100, 2}, 100, {0.7, 0.1, 1}, {0}},
 	};
 	const int sphere_count = 4;
 
