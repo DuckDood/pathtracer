@@ -53,9 +53,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 			x.columns[0][2],x.columns[1][2],x.columns[2][2],x.columns[3][2],
 			x.columns[0][3],x.columns[1][3],x.columns[2][3],x.columns[3][3]
 			);*/
-	state->cam_yaw = 0;
-	state->cam_pitch = 0;
-	state->cam_pos = (vec3){0,0,0};
+	state->cam_yaw = -0.956666;
+	state->cam_pitch = 0.248333;
+	state->cam_pos = (vec3){1.937445, -0.791324, 0.774603};
 
 	SDL_Surface *win_surface = SDL_GetWindowSurface(state->window);
 
@@ -168,7 +168,7 @@ vec3 trace(ray r, sphere *spheres, int sphere_count) {
 			break;
 		};
 		current_ray.origin = hit_info.position;
-		current_ray.direction = random_in_hemiphere(hit_info.normal);
+		current_ray.direction = v3_norm(rand_vec() + hit_info.normal);
 	}
 	return incoming_light;
 }
