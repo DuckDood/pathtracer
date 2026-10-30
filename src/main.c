@@ -119,26 +119,19 @@ float hash(uint *rng_seed) {
 	return result / 4294967295.0;
 }
 
+float normal_hash(uint *state)
+{
+    // Thanks to https://stackoverflow.com/a/6178290
+    float theta = 2 * 3.1415926 * hash(state);
+    float rho = sqrt(-2 * log(hash(state)));
+    return rho * cos(theta);
+}
+
 vec3 rand_vec(uint *rng_seed) {
 	vec3 vec;
-	int count = 0;
-	while(true) {
-	/*	if(count > 20) printf(
-				"%f, %f, %f\n", hash(rng_seed), hash(rng_seed), hash(rng_seed)
-				);*/
-		/*vec[0] = ((double)rand()/RAND_MAX - 0.5) * 2;
-		vec[1] = ((double)rand()/RAND_MAX - 0.5) * 2;
-		vec[2] = ((double)rand()/RAND_MAX - 0.5) * 2;*/
-
-		vec[0] = hash(rng_seed) * 2 - 1;
-		vec[1] = hash(rng_seed) * 2 - 1;
-		vec[2] = hash(rng_seed) * 2 - 1;
-		//vec[0] = ((double)rand() / RAND_MAX) * 2 - 1;
-		//vec[1] = ((double)rand() / RAND_MAX) * 2 - 1;
-		//vec[2] = ((double)rand() / RAND_MAX) * 2 - 1;
-		if(v3_dot(vec, vec) <= 1) break;
-		count++;
-	}
+	vec[0] = normal_hash(rng_seed) * 2 - 1;
+	vec[1] = normal_hash(rng_seed) * 2 - 1;
+	vec[2] = normal_hash(rng_seed) * 2 - 1;
 	return v3_norm(vec);
 }
 
