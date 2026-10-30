@@ -156,7 +156,7 @@ vec3 sample_env_light(vec3 direction) {
 }
 
 vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
-	int bounce_count = 4;
+	int bounce_count = 10;
 	ray current_ray = r;
 	vec3 ray_color = (vec3){1, 1, 1, 1};
 	vec3 incoming_light = (vec3){0, 0, 0, 0};
@@ -184,7 +184,12 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 			break;
 		};
 		current_ray.origin = hit_info.position;
-		current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
+		//current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
+		if(hit_sphere == spheres || hit_sphere == spheres + 1) {
+			current_ray.direction = current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal;
+		} else {
+			current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
+		}
 	}
 	return incoming_light;
 }
@@ -228,8 +233,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			);*/
 
 	const sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {1, 0, 0}, {0}},
-	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
+	{{0, -0.4, 3}, 1, {1, 1, 1}, {0}},
+	{{2, -0.5, 3}, 0.5, {1, 1, 1}, {0}},
 	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0}},
 	{{-1, 100, 2}, 100, {0, 1, 1}, {0}},
 	};
