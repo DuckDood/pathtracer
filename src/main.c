@@ -183,7 +183,12 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 		if(min_t != INFINITY) {
 			current_ray.origin = hit_info.position;
 			if((hit_sphere == spheres || hit_sphere == spheres + 1)) {
-				current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 0.3f);
+			vec3 reflection_fuzz = rand_in_sphere(rng_seed);
+			vec3 reflection = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + reflection_fuzz * 0.3f);
+			if(v3_dot(reflection, hit_info.normal) < 0) {
+				reflection = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal - reflection_fuzz * 0.3f);;
+			}
+			current_ray.direction = reflection;
 			vec3 emitted_light = hit_sphere->emit;
 			incoming_light += emitted_light * ray_color;
 			ray_color *= hit_sphere->color;
