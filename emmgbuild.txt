@@ -17,6 +17,7 @@ src main.c
 src vectors.c
 src transformations.c
 src ray.c
+src material.c
 
 build pathtrace
 

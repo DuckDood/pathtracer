@@ -4,6 +4,8 @@
 typedef struct {
 	vec3 origin;
 	vec3 direction;
+	vec3 color;
+	vec3 incoming_light;
 } ray;
 
 typedef struct {
@@ -12,14 +14,3 @@ typedef struct {
 	float distance;
 	_Bool hit;
 } hitinfo;
-
-
-typedef struct {
-	vec3 position;
-	float radius;
-	vec3 color;
-	vec3 emit;
-} sphere;
-
-
-hitinfo ray_sphere_intersection(ray r, sphere s);

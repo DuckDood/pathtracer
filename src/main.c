@@ -6,6 +6,7 @@
 #include <vectors.h>
 #include <transformations.h>
 #include <ray.h>
+#include <shapes.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -165,8 +166,8 @@ vec3 sample_env_light(vec3 direction) {
 vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 	int bounce_count = 10;
 	ray current_ray = r;
-	vec3 ray_color = (vec3){1, 1, 1, 1};
-	vec3 incoming_light = (vec3){0, 0, 0, 0};
+	current_ray.color = (vec3){1, 1, 1, 1};
+	current_ray.incoming_light = (vec3){0, 0, 0, 0};
 	for(int bounce = 0; bounce < bounce_count; ++bounce) {
 		float min_t = INFINITY;
 		const sphere *hit_sphere = NULL;
@@ -181,12 +182,15 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 			}
 		}
 		if(min_t != INFINITY) {
+			material_bounce(hit_sphere->mat, &current_ray, hit_info, rng_seed);
+			current_ray.origin = hit_info.position;
+			/*
 			current_ray.origin = hit_info.position;
 			if((hit_sphere == spheres || hit_sphere == spheres + 1)) {
 			vec3 reflection_fuzz = rand_in_sphere(rng_seed);
 			vec3 reflection = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + reflection_fuzz * 0.3f);
 			if(v3_dot(reflection, hit_info.normal) < 0) {
-				reflection = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal - reflection_fuzz * 0.3f);;
+				reflection = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal - reflection_fuzz * 0.3f);
 			}
 			current_ray.direction = reflection;
 			vec3 emitted_light = hit_sphere->emit;
@@ -200,20 +204,20 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 			incoming_light += emitted_light * ray_color;
 			ray_color *= hit_sphere->color;
 				} else
-					current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 1.f);
+					current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 0.1f);
 			vec3 emitted_light = hit_sphere->emit;
 			incoming_light += emitted_light * ray_color;
 			//ray_color *= hit_sphere->color;
 			}
-			//return 0.5*(normal + 1);
+			//return 0.5*(normal + 1);*/
 		} else {
 			//light *= environment(current_ray.direction);
-			incoming_light += sample_env_light(current_ray.direction) * ray_color;
+			current_ray.incoming_light += sample_env_light(current_ray.direction) * current_ray.color;
 			break;
 		};
 	}
-	incoming_light[3] = 1;
-	return incoming_light;
+	current_ray.incoming_light[3] = 1;
+	return current_ray.incoming_light;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
@@ -255,10 +259,30 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			);*/
 
 	const sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {1, 1, 1}, {0}},
-	{{2, -0.5, 3}, 0.5, {0, 1, 0}, {0}},
-	{{-1, -0.14, 2}, 0.3, {0, 0, 1}, {0, 0, 0}},
-	{{-1, 100, 2}, 100, {0.7, 0.1, 1}, {0}},
+	{{0, -0.4, 3}, 1, {
+					{1, 0, 0},
+					{0, 0, 0},
+					{1, 1, 0},
+					1,0.9
+					  }},
+	{{2, -0.5, 3}, 0.5, {
+					{0, 1, 0},
+					{0, 0, 0},
+					{1, 1, 1},
+					0.8,0.4
+						}},
+	{{-1, -0.14, 2}, 0.3, {
+					{0, 0, 1},
+					{0, 0, 0},
+					{1, 1, 1},
+					0.4,0.3
+						  }},
+	{{-1, 100, 2}, 100, {
+					{0.1, 0.6, 0.5},
+					{0, 0, 0},
+					{1, 1, 1},
+					0.1, 0
+						}},
 	};
 	const int sphere_count = 4;
 
