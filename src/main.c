@@ -181,23 +181,31 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
 			}
 		}
 		if(min_t != INFINITY) {
+			current_ray.origin = hit_info.position;
+			if((hit_sphere == spheres || hit_sphere == spheres + 1)) {
+				current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 0.3f);
 			vec3 emitted_light = hit_sphere->emit;
 			incoming_light += emitted_light * ray_color;
 			ray_color *= hit_sphere->color;
+			} else {
+				if(hash(rng_seed) > 0.5)
+				{
+					current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
+			vec3 emitted_light = hit_sphere->emit;
+			incoming_light += emitted_light * ray_color;
+			ray_color *= hit_sphere->color;
+				} else
+					current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 1.f);
+			vec3 emitted_light = hit_sphere->emit;
+			incoming_light += emitted_light * ray_color;
+			//ray_color *= hit_sphere->color;
+			}
 			//return 0.5*(normal + 1);
 		} else {
 			//light *= environment(current_ray.direction);
 			incoming_light += sample_env_light(current_ray.direction) * ray_color;
 			break;
 		};
-		current_ray.origin = hit_info.position;
-		if((hit_sphere == spheres || hit_sphere == spheres + 1)) {
-			current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal + rand_in_sphere(rng_seed) * 0.3f);
-			//current_ray.direction = v3_norm(current_ray.direction - 2 * v3_dot(current_ray.direction, hit_info.normal) * hit_info.normal);
-			//current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		} else {
-			current_ray.direction = v3_norm(rand_vec(rng_seed) + hit_info.normal);
-		}
 	}
 	incoming_light[3] = 1;
 	return incoming_light;
