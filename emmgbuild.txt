@@ -18,6 +18,7 @@ src vectors.c
 src transformations.c
 src ray.c
 src material.c
+src randoms.c
 
 build pathtrace
 
