@@ -13,7 +13,7 @@ git clone https://github.com/DuckDood/pathtracer.git
 cd pathtracer
 make
 ```
-This puts a `pathtracer` binary in the build/ directory.
+This puts a `pathtrace` binary in the build/ directory.
 
 ## Credits
 I mainly used the [Ray tracing in one weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html) book and [Sebastian lague's video about ray tracing](https://www.youtube.com/watch?v=Qz0KTGYJtUk) for this project, but I also used some wikipedia relating to matrix transforms and triangle-ray intersection tests.
