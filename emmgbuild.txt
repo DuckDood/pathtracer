@@ -1,7 +1,7 @@
 dir obj
 dir build
 
-compiler gcc
+compiler ${CC}
 srcflag ${CFLAGS}
 buildflag ${LDFLAGS}
 

@@ -17,49 +17,49 @@ endif
 
 obj/main.c.o: src/main.c 
 ifeq (${OSMODE}, l)
-	gcc src/main.c -c -o obj/main.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/main.c -c -o obj/main.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/main.c -c -o obj/main.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/main.c -c -o obj/main.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
 obj/vectors.c.o: src/vectors.c 
 ifeq (${OSMODE}, l)
-	gcc src/vectors.c -c -o obj/vectors.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/vectors.c -c -o obj/vectors.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/vectors.c -c -o obj/vectors.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/vectors.c -c -o obj/vectors.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
 obj/transformations.c.o: src/transformations.c 
 ifeq (${OSMODE}, l)
-	gcc src/transformations.c -c -o obj/transformations.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/transformations.c -c -o obj/transformations.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/transformations.c -c -o obj/transformations.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/transformations.c -c -o obj/transformations.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
 obj/shapes.c.o: src/shapes.c 
 ifeq (${OSMODE}, l)
-	gcc src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
 obj/material.c.o: src/material.c 
 ifeq (${OSMODE}, l)
-	gcc src/material.c -c -o obj/material.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/material.c -c -o obj/material.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/material.c -c -o obj/material.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/material.c -c -o obj/material.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
 obj/randoms.c.o: src/randoms.c 
 ifeq (${OSMODE}, l)
-	gcc src/randoms.c -c -o obj/randoms.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/randoms.c -c -o obj/randoms.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/randoms.c -c -o obj/randoms.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	${CC} src/randoms.c -c -o obj/randoms.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
