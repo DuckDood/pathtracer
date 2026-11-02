@@ -8,7 +8,8 @@ This is a simple multithreaded software pathtracer written in C and SDL that tra
 Try it out [here](https://duckdood.github.io/terra/pathtracer/)
 
 ## Building locally (tested with GCC)
-```git clone https://github.com/DuckDood/pathtracer.git
+```
+git clone https://github.com/DuckDood/pathtracer.git
 cd pathtracer
 make
 ```
