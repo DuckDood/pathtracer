@@ -134,6 +134,7 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 	for(int bounce = 0; bounce < bounce_count; ++bounce) {
 		float min_t = INFINITY;
 		const sphere *hit_sphere = NULL;
+		material mat;
 		hitinfo hit_info;
 		for(int i = 0; i < sphere_count; ++i) {
 			hitinfo info = ray_sphere_intersection(current_ray, spheres[i]);
@@ -142,10 +143,32 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 				hit_sphere = spheres + i;
 				min_t = info.distance;
 				hit_info = info;
+				mat = spheres[i].mat;
 			}
 		}
+
+		for(int i = 0; i < 1; ++i) {
+			tri t;
+			t.vertex_c = spheres[0].position;
+			t.vertex_b = spheres[1].position;
+			t.vertex_a = spheres[2].position;
+
+			t.mat = spheres[1].mat;
+
+			hitinfo info = ray_tri_intersection(current_ray, t);
+
+			if(!info.hit) continue;
+
+			if(info.distance < min_t) {
+				min_t = info.distance;
+				hit_info = info;
+				mat = t.mat;
+			}
+		}
+
+
 		if(min_t != INFINITY) {
-			material_bounce(hit_sphere->mat, &current_ray, hit_info, rng_seed);
+			material_bounce(mat, &current_ray, hit_info, rng_seed);
 			current_ray.origin = hit_info.position;
 			/*
 			current_ray.origin = hit_info.position;
