@@ -1,4 +1,4 @@
-all: obj/ build/ obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/ray.c.o obj/material.c.o obj/randoms.c.o build/pathtrace 
+all: obj/ build/ obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o build/pathtrace 
 OSMODE := l
 
 obj/: 
@@ -39,11 +39,11 @@ else
 endif
 
 
-obj/ray.c.o: src/ray.c 
+obj/shapes.c.o: src/shapes.c 
 ifeq (${OSMODE}, l)
-	gcc src/ray.c -c -o obj/ray.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	gcc src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	gcc src/ray.c -c -o obj/ray.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+	gcc src/shapes.c -c -o obj/shapes.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 endif
 
 
@@ -63,11 +63,11 @@ else
 endif
 
 
-build/pathtrace: obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/ray.c.o obj/material.c.o obj/randoms.c.o 
+build/pathtrace: obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o 
 ifeq (${OSMODE}, l)
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/ray.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
 else
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/ray.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
 endif
 
 
@@ -95,9 +95,9 @@ else
 	clang src/transformations.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/2.json -fsyntax-only
 endif
 ifeq (${OSMODE}, l)
-	clang src/ray.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/3.json -fsyntax-only
+	clang src/shapes.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/3.json -fsyntax-only
 else
-	clang src/ray.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/3.json -fsyntax-only
+	clang src/shapes.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/3.json -fsyntax-only
 endif
 ifeq (${OSMODE}, l)
 	clang src/material.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/4.json -fsyntax-only

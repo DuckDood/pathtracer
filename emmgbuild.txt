@@ -16,7 +16,7 @@ srcflag -Iinclude
 src main.c
 src vectors.c
 src transformations.c
-src ray.c
+src shapes.c
 src material.c
 src randoms.c
 

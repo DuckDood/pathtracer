@@ -1,7 +1,6 @@
-#include <float.h>
-#include <math.h>
-#include <ray.h>
 #include <shapes.h>
+#include <math.h>
+#include <float.h>
 
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html#rays,asimplecamera,andbackground/therayclass
 hitinfo ray_sphere_intersection(ray r, sphere s) {
