@@ -147,26 +147,6 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 			}
 		}
 
-		for(int i = 0; i < 1; ++i) {
-			tri t;
-			t.vertex_c = spheres[0].position;
-			t.vertex_b = spheres[1].position;
-			t.vertex_a = spheres[2].position;
-
-			t.mat = spheres[1].mat;
-
-			hitinfo info = ray_tri_intersection(current_ray, t);
-
-			if(!info.hit) continue;
-
-			if(info.distance < min_t) {
-				min_t = info.distance;
-				hit_info = info;
-				mat = t.mat;
-			}
-		}
-
-
 		if(min_t != INFINITY) {
 			material_bounce(mat, &current_ray, hit_info, rng_seed);
 			current_ray.origin = hit_info.position;
@@ -198,6 +178,37 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 			//return 0.5*(normal + 1);*/
 		} else {
 			//light *= environment(current_ray.direction);
+			current_ray.incoming_light += sample_env_light(current_ray.direction) * current_ray.color;
+			break;
+		};
+	}
+	current_ray.incoming_light[3] = 1;
+	return current_ray.incoming_light;
+}
+
+vec3 trace_tris(ray r, const tri *tris, int tri_count, uint32_t *rng_seed) {
+	int bounce_count = 10;
+	ray current_ray = r;
+	current_ray.color = (vec3){1, 1, 1, 1};
+	current_ray.incoming_light = (vec3){0, 0, 0, 0};
+	for(int bounce = 0; bounce < bounce_count; ++bounce) {
+		float min_t = INFINITY;
+		material mat;
+		hitinfo hit_info;
+		for(int i = 0; i < tri_count; ++i) {
+			hitinfo info = ray_tri_intersection(current_ray, tris[i]);
+			if(!info.hit) continue;
+			if(info.distance < min_t) {
+				min_t = info.distance;
+				hit_info = info;
+				mat = tris[i].mat;
+			}
+		}
+
+		if(min_t != INFINITY) {
+			material_bounce(mat, &current_ray, hit_info, rng_seed);
+			current_ray.origin = hit_info.position;
+		} else {
 			current_ray.incoming_light += sample_env_light(current_ray.direction) * current_ray.color;
 			break;
 		};
@@ -255,7 +266,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 					{0, 1, 0},
 					{0, 0, 0},
 					{1, 1, 1},
-					0,1
+					0.8,0.6
 						}},
 	{{-1, -0.14, 2}, 0.3, {
 					{0, 0, 1},
@@ -270,7 +281,147 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 					0.1, 0
 						}},
 	};
+
 	const int sphere_count = 4;
+
+	const tri tris[10] = {
+		// left face
+		{
+			{-1, -1, 0},
+			{-1, -1, -1},
+			{-1, 1, -1},
+			{
+				.color = (vec3){1, 0, 0},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{-1, -1, 0},
+			{-1, 1, 1},
+			{-1, 1, -1},
+			{
+				.color = (vec3){1, 0, 0},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+
+		// right face
+		{
+			{1, -1, 0},
+			{1, -1, -1},
+			{1, 1, -1},
+			{
+				.color = (vec3){0, 1, 0},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{1, -1, 0},
+			{1, 1, 1},
+			{1, 1, -1},
+			{
+				.color = (vec3){0, 1, 0},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		// back face
+		{
+			{-1, 1, -1},
+			{1, 1, -1},
+			{-1, -1, -1},
+			{
+				.color = (vec3){0, 0, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{-1, -1, -1},
+			{1, -1, -1},
+			{1, 1, -1},
+			{
+				.color = (vec3){0, 0, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		// bottom face
+		{
+			{-1, -1, 1},
+			{1, -1, 1},
+			{-1, -1, -1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{-1, -1, -1},
+			{1, -1, -1},
+			{1, -1, 1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		// top face
+		{
+			{-1, 1, 1},
+			{1, 1, 1},
+			{-1, 1, -1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{-1, 1, -1},
+			{1, 1, -1},
+			{1, 1, 1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+	};
+	const int tricount = 10;
 
 #pragma omp parallel for
 	for(int i = 0; i < state->pixels.height * state->pixels.width; ++i) {
