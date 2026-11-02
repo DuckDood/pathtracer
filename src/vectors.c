@@ -16,6 +16,14 @@ vec3 v3_norm(vec3 a) {
 	return a/(float)sqrt(v3_dot(a,a));
 }
 
+vec3 v3_cross(vec3 a, vec3 b) {
+	return (vec3){
+		a[1] * b[2] - a[2]*b[1],
+		a[2] * b[0] - a[0]*b[2],
+		a[0] * b[1] - a[1]*b[0],
+	};
+}
+
 vec4 v3_to_4(vec3 a) {
 	a[3] = 0;
 	return a;
