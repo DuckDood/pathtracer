@@ -70,9 +70,9 @@ hitinfo ray_tri_intersection(ray r, tri tri) {
 
 	if(t > FLT_EPSILON) {
 		out.hit = 1;
-		out.normal = normal;
+		out.normal = v3_norm(normal);
 		out.distance = t;
-		out.position = r.direction * t;
+		out.position = r.direction * t + r.origin;
 		return out;
 	}
 
