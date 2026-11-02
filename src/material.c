@@ -7,7 +7,7 @@
 #include <randoms.h>
 
 
-void material_bounce(material material, ray *r, hitinfo info, uint *rng_seed) {
+void material_bounce(material material, ray *r, hitinfo info, uint32_t *rng_seed) {
 	if(hash(rng_seed) < material.specularity) {
 		vec3 reflection_fuzz = rand_in_sphere(rng_seed);
 		vec3 reflection = v3_norm(r->direction - 2 * v3_dot(r->direction, info.normal) * info.normal + reflection_fuzz * material.roughness);

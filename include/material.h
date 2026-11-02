@@ -1,5 +1,5 @@
 #include <vectors.h>
-#include <stdlib.h>
+#include <includes.h>
 #include <ray.h>
 
 typedef struct {
@@ -10,4 +10,4 @@ typedef struct {
 	float specularity;
 } material;
 
-void material_bounce(material material, ray *r, hitinfo info, uint *rng_seed);
+void material_bounce(material material, ray *r, hitinfo info, uint32_t *rng_seed);

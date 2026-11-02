@@ -126,7 +126,7 @@ vec3 sample_env_light(vec3 direction) {
 	return ground + sky + sun;
 }
 
-vec3 trace(ray r, const sphere *spheres, int sphere_count, uint *rng_seed) {
+vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 	int bounce_count = 10;
 	ray current_ray = r;
 	current_ray.color = (vec3){1, 1, 1, 1};
@@ -252,7 +252,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 #pragma omp parallel for
 	for(int i = 0; i < state->pixels.height * state->pixels.width; ++i) {
 		//for(int x = 0; x < state->pixels.width; ++x) {
-		uint rng_seed = i + state->frame_accumulation_count * 2304894;
+		uint32_t rng_seed = i + state->frame_accumulation_count * 2304894;
 		const int x = i % state->pixels.width;
 		const int y = i / state->pixels.width;
 		float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
