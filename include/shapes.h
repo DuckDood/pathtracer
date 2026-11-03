@@ -17,4 +17,4 @@ typedef struct {
 
 hitinfo ray_sphere_intersection(ray r, sphere s);
 
-hitinfo ray_tri_intersection(ray r, tri s);
+hitinfo ray_tri_intersection(ray *r, tri s);

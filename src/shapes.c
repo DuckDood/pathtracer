@@ -24,19 +24,19 @@ hitinfo ray_sphere_intersection(ray r, sphere s) {
 }
 
 // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
-hitinfo ray_tri_intersection(ray r, tri tri) {
+hitinfo ray_tri_intersection(ray *r, tri tri) {
 	hitinfo out;
 	vec3 edge1 = tri.vertex_b - tri.vertex_a;
 	vec3 edge2 = tri.vertex_c - tri.vertex_a;
 
 	vec3 normal = v3_cross(edge1, edge2);
 
-	if(v3_dot(normal, r.direction) > 0) {
+	if(v3_dot(normal, r->direction) > 0) {
 		out.hit = 0;
 		return out;
 	}
 
-	vec3 ray_cross_e2 = v3_cross(r.direction, edge2);
+	vec3 ray_cross_e2 = v3_cross(r->direction, edge2);
 
 	float det = v3_dot(edge1, ray_cross_e2);
 
@@ -47,7 +47,7 @@ hitinfo ray_tri_intersection(ray r, tri tri) {
 
 	float inv_det = 1/det;
 
-	vec3 s = r.origin - tri.vertex_a;
+	vec3 s = r->origin - tri.vertex_a;
 
 	float u = inv_det * v3_dot(s, ray_cross_e2);
 
@@ -58,7 +58,7 @@ hitinfo ray_tri_intersection(ray r, tri tri) {
 
 	vec3 s_cross_e1 = v3_cross(s, edge1);
 
-	float v = inv_det * v3_dot(r.direction, s_cross_e1);
+	float v = inv_det * v3_dot(r->direction, s_cross_e1);
 
 	if (v < -FLT_EPSILON || u + v - 1 > FLT_EPSILON) {
 		out.hit = 0;
@@ -71,7 +71,7 @@ hitinfo ray_tri_intersection(ray r, tri tri) {
 		out.hit = 1;
 		out.normal = v3_norm(normal);
 		out.distance = t;
-		out.position = r.direction * t + r.origin;
+		out.position = r->direction * t + r->origin;
 		return out;
 	}
 

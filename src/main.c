@@ -12,8 +12,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#define WIDTH 800
-#define HEIGHT 600
+#define WIDTH 800/2
+#define HEIGHT 600/2
 
 typedef struct {
 	int width, height;
@@ -32,6 +32,7 @@ struct program_state {
 };
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
+	printf("ray: %zi, hitinfo: %zi\n", sizeof(ray), sizeof(hitinfo));
 	*appstate = malloc(sizeof(struct program_state));
 	struct program_state *state = (struct program_state*)*appstate;
 
@@ -122,12 +123,12 @@ vec3 sample_env_light(vec3 direction) {
 
 	float sun = pow(v3_dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
 
-	//return (vec3){0};
+	return (vec3){0};
 	return ground + sky + sun;
 }
 
 vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
-	int bounce_count = 10;
+	int bounce_count = 4;
 	ray current_ray = r;
 	current_ray.color = (vec3){1, 1, 1, 1};
 	current_ray.incoming_light = (vec3){0, 0, 0, 0};
@@ -186,9 +187,9 @@ vec3 trace(ray r, const sphere *spheres, int sphere_count, uint32_t *rng_seed) {
 	return current_ray.incoming_light;
 }
 
-vec3 trace_tris(ray r, const tri *tris, int tri_count, uint32_t *rng_seed) {
+vec3 trace_tris(ray *r, const tri *tris, int tri_count, uint32_t *rng_seed) {
 	int bounce_count = 10;
-	ray current_ray = r;
+	ray current_ray = *r;
 	current_ray.color = (vec3){1, 1, 1, 1};
 	current_ray.incoming_light = (vec3){0, 0, 0, 0};
 	for(int bounce = 0; bounce < bounce_count; ++bounce) {
@@ -196,7 +197,7 @@ vec3 trace_tris(ray r, const tri *tris, int tri_count, uint32_t *rng_seed) {
 		material mat;
 		hitinfo hit_info;
 		for(int i = 0; i < tri_count; ++i) {
-			hitinfo info = ray_tri_intersection(current_ray, tris[i]);
+			hitinfo info = ray_tri_intersection(&current_ray, tris[i]);
 			if(!info.hit) continue;
 			if(info.distance < min_t) {
 				min_t = info.distance;
@@ -284,12 +285,12 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	const int sphere_count = 4;
 
-	const tri tris[10] = {
+	const tri tris[12] = {
 		// left face
 		{
-			{-1, -1, 0},
-			{-1, -1, -1},
 			{-1, 1, -1},
+			{-1, -1, 1},
+			{-1, -1, -1},
 			{
 				.color = (vec3){1, 0, 0},
 				.emissive_color = (vec3){0,0,0},
@@ -300,9 +301,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		},
 
 		{
-			{-1, -1, 0},
-			{-1, 1, 1},
 			{-1, 1, -1},
+			{-1, 1, 1},
+			{-1, -1, 1},
 			{
 				.color = (vec3){1, 0, 0},
 				.emissive_color = (vec3){0,0,0},
@@ -315,8 +316,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 		// right face
 		{
-			{1, -1, 0},
 			{1, -1, -1},
+			{1, -1, 1},
 			{1, 1, -1},
 			{
 				.color = (vec3){0, 1, 0},
@@ -328,7 +329,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		},
 
 		{
-			{1, -1, 0},
+			{1, -1, 1},
 			{1, 1, 1},
 			{1, 1, -1},
 			{
@@ -342,9 +343,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 		// back face
 		{
+			{-1, -1, -1},
+			{1, 1, -1},
 			{-1, 1, -1},
-			{1, 1, -1},
-			{-1, -1, -1},
 			{
 				.color = (vec3){0, 0, 1},
 				.emissive_color = (vec3){0,0,0},
@@ -360,33 +361,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 			{1, 1, -1},
 			{
 				.color = (vec3){0, 0, 1},
-				.emissive_color = (vec3){0,0,0},
-				.specular_color = (vec3){0,0,0},
-				.roughness = 0,
-				.specularity = 0
-			}
-		},
-
-		// bottom face
-		{
-			{-1, -1, 1},
-			{1, -1, 1},
-			{-1, -1, -1},
-			{
-				.color = (vec3){1, 1, 1},
-				.emissive_color = (vec3){0,0,0},
-				.specular_color = (vec3){0,0,0},
-				.roughness = 0,
-				.specularity = 0
-			}
-		},
-
-		{
-			{-1, -1, -1},
-			{1, -1, -1},
-			{1, -1, 1},
-			{
-				.color = (vec3){1, 1, 1},
 				.emissive_color = (vec3){0,0,0},
 				.specular_color = (vec3){0,0,0},
 				.roughness = 0,
@@ -396,9 +370,36 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 		// top face
 		{
-			{-1, 1, 1},
-			{1, 1, 1},
+			{-1, -1, -1},
+			{-1, -1, 1},
+			{1, -1, 1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			{1, -1, 1},
+			{1, -1, -1},
+			{-1, -1, -1},
+			{
+				.color = (vec3){1, 1, 1},
+				.emissive_color = (vec3){0,0,0},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		// bottom face
+		{
 			{-1, 1, -1},
+			{1, 1, 1},
+			{-1, 1, 1},
 			{
 				.color = (vec3){1, 1, 1},
 				.emissive_color = (vec3){0,0,0},
@@ -419,9 +420,37 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 				.roughness = 0,
 				.specularity = 0
 			}
+
+		},
+
+		// top face
+		{
+			(vec3){-1, -1.1, -1} * 0.75f,
+			(vec3){-1, -1.1, 1} * 0.75f,
+			(vec3){1, -1.1, 1} * 0.75f,
+			{
+				.color = (vec3){0, 0, 0},
+				.emissive_color = (vec3){2,2,2},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
+		},
+
+		{
+			(vec3){1, -1.1, 1} * 0.75f,
+			(vec3){1, -1.1, -1} * 0.75f,
+			(vec3){-1, -1.1, -1} * 0.75f,
+			{
+				.color = (vec3){0, 0, 0},
+				.emissive_color = (vec3){2,2,2},
+				.specular_color = (vec3){0,0,0},
+				.roughness = 0,
+				.specularity = 0
+			}
 		},
 	};
-	const int tricount = 10;
+	const int tricount = 12;
 
 #pragma omp parallel for
 	for(int i = 0; i < state->pixels.height * state->pixels.width; ++i) {
@@ -451,10 +480,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 		vec4 colors[4];
 
-		colors[0] = trace(cam_rays[0], spheres, sphere_count, &rng_seed);
-		colors[1] = trace(cam_rays[1], spheres, sphere_count, &rng_seed);
-		colors[2] = trace(cam_rays[2], spheres, sphere_count, &rng_seed);
-		colors[3] = trace(cam_rays[3], spheres, sphere_count, &rng_seed);
+		colors[0] = trace_tris(&cam_rays[0], tris, tricount, &rng_seed);
+		colors[1] = trace_tris(&cam_rays[1], tris, tricount, &rng_seed);
+		colors[2] = trace_tris(&cam_rays[2], tris, tricount, &rng_seed);
+		colors[3] = trace_tris(&cam_rays[3], tris, tricount, &rng_seed);
 		/*float min_t = INFINITY;
 		  sphere *hit_sphere = NULL;
 		  for(int i = 0; i < sphere_count; ++i) {
