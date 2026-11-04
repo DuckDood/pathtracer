@@ -357,9 +357,6 @@ vec3 trace_tris(ray *r, const tri *tris, int tri_count, uint32_t *rng_seed) {
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
 	struct program_state *state = (struct program_state*)appstate;
-	SDL_Surface *win_orig_surface = SDL_GetWindowSurface(state->window);
-	SDL_Surface *win_surface = SDL_ConvertSurface(win_orig_surface, SDL_PIXELFORMAT_ABGR8888);
-
 
 	float aspect_ratio = (float)state->pixels.width / state->pixels.height;
 
@@ -386,41 +383,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	}
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
-	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
-			cam_matrix.columns[0][0],cam_matrix.columns[1][0],cam_matrix.columns[2][0],cam_matrix.columns[3][0],
-			cam_matrix.columns[0][1],cam_matrix.columns[1][1],cam_matrix.columns[2][1],cam_matrix.columns[3][1],
-			cam_matrix.columns[0][2],cam_matrix.columns[1][2],cam_matrix.columns[2][2],cam_matrix.columns[3][2],
-			cam_matrix.columns[0][3],cam_matrix.columns[1][3],cam_matrix.columns[2][3],cam_matrix.columns[3][3]
-			);*/
-
-	const sphere spheres[4] = {
-	{{0, -0.4, 3}, 1, {
-					{1, 0, 0},
-					{0, 0, 0},
-					{1, 1, 0},
-					1,0.9
-					  }},
-	{{2, -0.5, 3}, 0.5, {
-					{0, 1, 0},
-					{0, 0, 0},
-					{1, 1, 1},
-					0.8,0.6
-						}},
-	{{-1, -0.14, 2}, 0.3, {
-					{0, 0, 1},
-					{0, 0, 0},
-					{1, 1, 1},
-					0.4,0.3
-						  }},
-	{{-1, 100, 2}, 100, {
-					{0.1, 0.6, 0.5},
-					{0, 0, 0},
-					{1, 1, 1},
-					0.1, 0
-						}},
-	};
-
-	const int sphere_count = 4;
 
 	const tri tris[12] = {
 		// left face
@@ -589,98 +551,31 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	};
 	const int tricount = 12;
 
-#pragma omp parallel for
-	for(int i = 0; i < state->pixels.height * state->pixels.width; ++i) {
-		//for(int x = 0; x < state->pixels.width; ++x) {
-		uint32_t rng_seed = i + state->frame_accumulation_count * 2304894;
-		const int x = i % state->pixels.width;
-		const int y = i / state->pixels.width;
-		float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
-		float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
+	WGPUSurfaceTexture tex;
+	wgpuSurfaceGetCurrentTexture(state->surf, &tex);
 
-		float aa = 1;
-		float x_halfpix = 0.5/state->pixels.width * aa;
-		float y_halfpix = 0.5/state->pixels.height * aa;
+	WGPUStringView dev_label;
+	dev_label.data = "tex_view_desc";
+	dev_label.length = 13;
 
-		ray cam_rays[4];
-		cam_rays[0].origin = state->cam_pos;
-		cam_rays[0].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio + x_halfpix, ndc_y, 1, 1}));
+	WGPUTextureViewDescriptor tex_view_desc = {0};
+	tex_view_desc.nextInChain = NULL;
+	tex_view_desc.label = dev_label;
+	tex_view_desc.format = wgpuTextureGetFormat(tex.texture);
+	tex_view_desc.dimension = WGPUTextureViewDimension_2D;
+	tex_view_desc.baseMipLevel = 0;
+	tex_view_desc.mipLevelCount = 1;
+	tex_view_desc.baseArrayLayer = 0;
+	tex_view_desc.arrayLayerCount = 1;
+	tex_view_desc.aspect = WGPUTextureAspect_All;
+	WGPUTextureView target_view = wgpuTextureCreateView(tex.texture, &tex_view_desc);
 
-		cam_rays[1].origin = state->cam_pos;
-		cam_rays[1].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio - x_halfpix, ndc_y, 1, 1}));
+	wgpuSurfacePresent(state->surf);
 
-		cam_rays[2].origin = state->cam_pos;
-		cam_rays[2].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio + y_halfpix, ndc_y, 1, 1}));
+	#ifndef WEBGPU_BACKEND_WGPU
+    wgpuTextureRelease(tex.texture);
+	#endif 
 
-		cam_rays[3].origin = state->cam_pos;
-		cam_rays[3].direction = v3_norm(m4_v4_mul(rot_matrix, (vec4){ndc_x * aspect_ratio - y_halfpix, ndc_y, 1, 1}));
-
-		vec4 colors[4];
-
-		colors[0] = trace_tris(&cam_rays[0], tris, tricount, &rng_seed);
-		colors[1] = trace_tris(&cam_rays[1], tris, tricount, &rng_seed);
-		colors[2] = trace_tris(&cam_rays[2], tris, tricount, &rng_seed);
-		colors[3] = trace_tris(&cam_rays[3], tris, tricount, &rng_seed);
-		/*float min_t = INFINITY;
-		  sphere *hit_sphere = NULL;
-		  for(int i = 0; i < sphere_count; ++i) {
-		  float t = ray_sphere_intersection(cam_ray, spheres[i]);
-		  if(t <= 0) continue;
-		  if(t < min_t) {
-		  hit_sphere = spheres + i;
-		  min_t = t;
-		  }
-		  }
-		  if(min_t != INFINITY) {
-		  color = hit_sphere->color;
-		  }*/
-		/*if(hit_sphere == NULL) {
-		  printf("hi\n");
-		  }*/
-		//float t = ray_sphere_intersection(cam_ray, (vec3){0, 0, 3}, 1);
-		//float t = ray_sphere_intersection(cam_ray, (vec3){1, 0, 2}, 0.5);
-		/*float t = ray_sphere_intersection(cam_ray, spheres[0]);
-		  if(t > 0) {
-		  vec3 normal = cam_ray.direction * t - (vec3){0, 0, 3} + cam_ray.origin;
-		  color = (normal + 1) * 0.5;
-		//color[0] = 1;
-		}*/
-		//}	color[0] = 1;
-
-		colors[0][3] = 1;
-		colors[1][3] = 1;
-		colors[2][3] = 1;
-		colors[3][3] = 1;
-
-		vec4 color = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
-
-
-		state->pixels.pixels[y * state->pixels.width + x] *= (float)state->frame_accumulation_count;
-		state->pixels.pixels[y * state->pixels.width + x] += color;
-		state->pixels.pixels[y * state->pixels.width + x] /= (float)state->frame_accumulation_count+1;
-		vec4 pix_color = state->pixels.pixels[y * state->pixels.width + x];
-		pix_color[0] = fmax(0, pix_color[0]);
-		pix_color[1] = fmax(0, pix_color[1]);
-		pix_color[2] = fmax(0, pix_color[2]);
-		pix_color[3] = fmax(0, pix_color[3]);
-
-		pix_color[0] = fmin(1, pix_color[0]);
-		pix_color[1] = fmin(1, pix_color[1]);
-		pix_color[2] = fmin(1, pix_color[2]);
-		pix_color[3] = fmin(1, pix_color[3]);
-
-		//if(isnan(pix_color[0]) || isnan(pix_color[1]) || isnan(pix_color[2]))  pix_color = (vec4){0, 1, 0, 1};
-
-		// assuming little endian (i think maybe sdl accounts for it with pixelformats?)
-		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 0] = pix_color[0] * 255;
-		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 1] = pix_color[1] * 255;
-		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 2] = pix_color[2] * 255;
-		((uint8_t*)win_surface->pixels)[y * win_surface->pitch + x*SDL_BYTESPERPIXEL(win_surface->format) + 3] = pix_color[3] * 255;
-		//}
-	}
-	state->frame_accumulation_count++;
-
-	SDL_BlitSurface(win_surface, NULL, win_orig_surface, NULL);
-	//SDL_UpdateWindowSurface(state->window);
+	wgpuTextureViewRelease(target_view);
 	return SDL_APP_CONTINUE;
 }
