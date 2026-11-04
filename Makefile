@@ -1,4 +1,4 @@
-all: obj/ build/ obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o build/pathtrace 
+all: obj/ build/ obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o build/pathtrace 
 OSMODE := l
 
 obj/: 
@@ -63,11 +63,19 @@ else
 endif
 
 
-build/pathtrace: obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o 
+obj/sdl3webgpu.c.o: src/sdl3webgpu.c 
 ifeq (${OSMODE}, l)
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
+	${CC} src/sdl3webgpu.c -c -o obj/sdl3webgpu.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
 else
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3
+	${CC} src/sdl3webgpu.c -c -o obj/sdl3webgpu.c.o ${CFLAGS} -O3 -fopenmp -Iinclude
+endif
+
+
+build/pathtrace: obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o 
+ifeq (${OSMODE}, l)
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -lwgpu_native
+else
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -lwgpu_native
 endif
 
 
@@ -108,6 +116,11 @@ ifeq (${OSMODE}, l)
 	clang src/randoms.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/5.json -fsyntax-only
 else
 	clang src/randoms.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/5.json -fsyntax-only
+endif
+ifeq (${OSMODE}, l)
+	clang src/sdl3webgpu.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/6.json -fsyntax-only
+else
+	clang src/sdl3webgpu.c  ${CFLAGS} -O3 -fopenmp -Iinclude -MJ emmgtemp/6.json -fsyntax-only
 endif
 # not cross platform here sad i think
 	echo [ > emmgtemp/[

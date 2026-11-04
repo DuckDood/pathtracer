@@ -10,7 +10,7 @@ srcflag -O3
 srcflag -fopenmp
 buildflag -fopenmp
 
-buildflag -lSDL3
+buildflag -lSDL3 -lwgpu_native
 srcflag -Iinclude
 
 src main.c
@@ -19,6 +19,8 @@ src transformations.c
 src shapes.c
 src material.c
 src randoms.c
+
+src sdl3webgpu.c
 
 build pathtrace
 

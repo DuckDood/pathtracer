@@ -12,6 +12,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include <webgpu/webgpu.h>
+#include <sdl3webgpu.h>
+
 #define WIDTH 800/2
 #define HEIGHT 600/2
 
@@ -29,7 +32,23 @@ struct program_state {
 	float cam_yaw;
 	float cam_pitch;
 	vec3 cam_pos;
+
+	WGPUAdapter adapter;
+	WGPUDevice device;
+	WGPUQueue queue;
+	WGPUCommandEncoder encoder;
+	WGPUSurface surf;
 };
+
+void on_webgpu_adapter_request_end(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView view, void * userdata1, void *userdata2) {
+	*(WGPUAdapter*)userdata1 = adapter;
+	*(_Bool*)userdata2 = 1;
+}
+
+void webgpu_dev_callback(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView view, void * userdata1, void *userdata2) {
+	*(WGPUDevice*)userdata1 = device;
+	*(_Bool*)userdata2 = 1;
+}
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	printf("ray: %zi, hitinfo: %zi\n", sizeof(ray), sizeof(hitinfo));
@@ -48,6 +67,116 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	}
 	SDL_SetWindowRelativeMouseMode(state->window, true);
 
+	WGPUInstanceDescriptor desc = {0};
+	desc.nextInChain = NULL;
+
+#ifndef WEBGPU_BACKEND_EMSCRIPTEN
+	WGPUInstance instance = wgpuCreateInstance(&desc);
+#else
+	WGPU instance = wgpuCreateInstance(NULL);
+#endif
+
+
+	if(!instance) {
+		fprintf(stderr, "Failed to create webgpu instance\n");
+		return SDL_APP_FAILURE;
+ 	}
+
+	WGPURequestAdapterOptions adapter_opts = {0};
+	adapter_opts.nextInChain = NULL;
+	state->surf = SDL_GetWGPUSurface(instance, state->window);
+	adapter_opts.compatibleSurface = state->surf;
+
+	WGPURequestAdapterCallbackInfo adapter_callback_info = {0};
+	adapter_callback_info.nextInChain = NULL;
+	adapter_callback_info.callback = on_webgpu_adapter_request_end;
+	adapter_callback_info.userdata1 = &state->adapter;
+	_Bool done = 0;
+	adapter_callback_info.userdata2 = &done;
+	wgpuInstanceRequestAdapter(instance, &adapter_opts, adapter_callback_info);
+
+	#ifdef __EMSCRIPTEN__
+    while (!done) {
+        emscripten_sleep(100);
+    }
+	#endif // __EMSCRIPTEN__
+
+	if(!state->adapter) {
+		fprintf(stderr, "Failed to create webgpu adapter\n");
+		return SDL_APP_FAILURE;
+	}
+
+	wgpuInstanceRelease(instance);
+	
+	WGPUDeviceDescriptor dev_descriptor = {0};
+	dev_descriptor.nextInChain = NULL;
+	WGPUStringView dev_label;
+	dev_label.data = "Dev";
+	dev_label.length = 3;
+	dev_descriptor.label = dev_label;
+	dev_descriptor.requiredFeatureCount = 0;
+	dev_descriptor.requiredLimits = NULL;
+	dev_descriptor.defaultQueue.nextInChain = NULL;
+	dev_descriptor.defaultQueue.label = dev_label;
+
+	_Bool dev_done = 0;
+	WGPURequestDeviceCallbackInfo dev_callback_info = {0};
+	dev_callback_info.nextInChain = NULL;
+	dev_callback_info.callback = webgpu_dev_callback;
+	dev_callback_info.userdata1 = &state->device;
+	dev_callback_info.userdata2 = &dev_done;
+
+	wgpuAdapterRequestDevice(state->adapter, &dev_descriptor, dev_callback_info);
+
+	#ifdef __EMSCRIPTEN__
+    while (!dev_done) {
+        emscripten_sleep(100);
+    }
+	#endif
+
+	if(!state->device) {
+		fprintf(stderr, "Failed to create webgpu device\n");
+		return SDL_APP_FAILURE;
+	}
+
+	state->queue = wgpuDeviceGetQueue(state->device);
+
+	WGPUCommandEncoderDescriptor encoder_desc = {0};
+	encoder_desc.nextInChain = NULL;
+	encoder_desc.label = dev_label;
+	state->encoder = wgpuDeviceCreateCommandEncoder(state->device, &encoder_desc);
+
+	wgpuCommandEncoderInsertDebugMarker(state->encoder, dev_label);
+
+	WGPUCommandBufferDescriptor buf_desc = {0};
+	buf_desc.nextInChain = NULL;
+	buf_desc.label = dev_label;
+	WGPUCommandBuffer command = wgpuCommandEncoderFinish(state->encoder, &buf_desc);
+
+	wgpuQueueSubmit(state->queue, 1, &command);
+
+	wgpuCommandBufferRelease(command);
+
+	WGPUSurfaceConfiguration config = {0};
+	config.nextInChain = NULL;
+	config.width = WIDTH;
+	config.height = HEIGHT;
+
+	WGPUSurfaceCapabilities caps;
+	caps.nextInChain = NULL;
+	wgpuSurfaceGetCapabilities(state->surf, state->adapter, &caps);
+
+	config.format = caps.formats[0];
+	config.viewFormatCount = 0;
+	config.viewFormats = NULL;
+	config.usage = WGPUTextureUsage_RenderAttachment;
+	config.device = state->device;
+	config.presentMode = WGPUPresentMode_Fifo;
+	config.alphaMode = WGPUCompositeAlphaMode_Auto;
+
+	wgpuSurfaceConfigure(state->surf, &config);
+
+
 
 	/*printf("%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
 			x.columns[0][0],x.columns[1][0],x.columns[2][0],x.columns[3][0],
@@ -55,6 +184,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 			x.columns[0][2],x.columns[1][2],x.columns[2][2],x.columns[3][2],
 			x.columns[0][3],x.columns[1][3],x.columns[2][3],x.columns[3][3]
 			);*/
+	/*
 	state->cam_yaw = -0.956666;
 	state->cam_pitch = 0.248333;
 	state->cam_pos = (vec3){1.937445, -0.791324, 0.774603};
@@ -68,6 +198,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	state->frame_accumulation_count = 0;
 
 
+	return SDL_APP_CONTINUE;*/
 	return SDL_APP_CONTINUE;
 }
 
@@ -105,6 +236,12 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	if(state->window != NULL) {
 		SDL_DestroyWindow(state->window);
 	}
+
+	wgpuSurfaceRelease(state->surf);
+	wgpuAdapterRelease(state->adapter);
+	wgpuDeviceRelease(state->device);
+	wgpuQueueRelease(state->queue);
+	wgpuCommandEncoderRelease(state->encoder);
 }
 
 vec3 environment(vec3 direction) {
@@ -544,6 +681,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	state->frame_accumulation_count++;
 
 	SDL_BlitSurface(win_surface, NULL, win_orig_surface, NULL);
-	SDL_UpdateWindowSurface(state->window);
+	//SDL_UpdateWindowSurface(state->window);
 	return SDL_APP_CONTINUE;
 }
