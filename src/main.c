@@ -36,7 +36,6 @@ struct program_state {
 	WGPUAdapter adapter;
 	WGPUDevice device;
 	WGPUQueue queue;
-	WGPUCommandEncoder encoder;
 	WGPUSurface surf;
 };
 
@@ -141,22 +140,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	state->queue = wgpuDeviceGetQueue(state->device);
 
-	WGPUCommandEncoderDescriptor encoder_desc = {0};
-	encoder_desc.nextInChain = NULL;
-	encoder_desc.label = dev_label;
-	state->encoder = wgpuDeviceCreateCommandEncoder(state->device, &encoder_desc);
-
-	wgpuCommandEncoderInsertDebugMarker(state->encoder, dev_label);
-
-	WGPUCommandBufferDescriptor buf_desc = {0};
-	buf_desc.nextInChain = NULL;
-	buf_desc.label = dev_label;
-	WGPUCommandBuffer command = wgpuCommandEncoderFinish(state->encoder, &buf_desc);
-
-	wgpuQueueSubmit(state->queue, 1, &command);
-
-	wgpuCommandBufferRelease(command);
-
 	WGPUSurfaceConfiguration config = {0};
 	config.nextInChain = NULL;
 	config.width = WIDTH;
@@ -241,7 +224,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	wgpuAdapterRelease(state->adapter);
 	wgpuDeviceRelease(state->device);
 	wgpuQueueRelease(state->queue);
-	wgpuCommandEncoderRelease(state->encoder);
 }
 
 vec3 environment(vec3 direction) {
@@ -551,12 +533,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	};
 	const int tricount = 12;
 
-	WGPUSurfaceTexture tex;
-	wgpuSurfaceGetCurrentTexture(state->surf, &tex);
-
 	WGPUStringView dev_label;
 	dev_label.data = "tex_view_desc";
 	dev_label.length = 13;
+
+
+
+	WGPUSurfaceTexture tex;
+	wgpuSurfaceGetCurrentTexture(state->surf, &tex);
 
 	WGPUTextureViewDescriptor tex_view_desc = {0};
 	tex_view_desc.nextInChain = NULL;
@@ -569,6 +553,49 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	tex_view_desc.arrayLayerCount = 1;
 	tex_view_desc.aspect = WGPUTextureAspect_All;
 	WGPUTextureView target_view = wgpuTextureCreateView(tex.texture, &tex_view_desc);
+
+	WGPUCommandEncoderDescriptor encoder_desc = {0};
+	encoder_desc.nextInChain = NULL;
+	encoder_desc.label = dev_label;
+	WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(state->device, &encoder_desc);
+
+	WGPURenderPassDescriptor render_pass_desc = {0};
+	render_pass_desc.nextInChain = NULL;
+
+	WGPURenderPassColorAttachment col_attach = {0};
+
+	col_attach.view = target_view;
+	col_attach.resolveTarget = NULL;
+	col_attach.loadOp = WGPULoadOp_Clear;
+	col_attach.storeOp = WGPUStoreOp_Store;
+	col_attach.clearValue = (WGPUColor){ 0.9, 0.1, 0.2, 1.0 };
+	#ifndef WEBGPU_BACKEND_WGPU
+	col_attach.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	#endif
+	render_pass_desc.depthStencilAttachment = NULL;
+	render_pass_desc.timestampWrites = NULL;
+
+	render_pass_desc.colorAttachmentCount = 1;
+	render_pass_desc.colorAttachments = &col_attach;
+
+
+	WGPURenderPassEncoder render_pass = wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_desc);
+	wgpuRenderPassEncoderEnd(render_pass);
+	wgpuRenderPassEncoderRelease(render_pass);
+
+
+	wgpuCommandEncoderInsertDebugMarker(encoder, dev_label);
+
+	WGPUCommandBufferDescriptor buf_desc = {0};
+	buf_desc.nextInChain = NULL;
+	buf_desc.label = dev_label;
+	WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &buf_desc);
+
+	wgpuQueueSubmit(state->queue, 1, &command);
+
+	wgpuCommandBufferRelease(command);
+
+
 
 	wgpuSurfacePresent(state->surf);
 
