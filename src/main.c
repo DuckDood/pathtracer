@@ -37,6 +37,7 @@ struct program_state {
 	WGPUDevice device;
 	WGPUQueue queue;
 	WGPUSurface surf;
+	WGPURenderPipeline pipeline;
 };
 
 void on_webgpu_adapter_request_end(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView view, void * userdata1, void *userdata2) {
@@ -182,6 +183,93 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 
 	return SDL_APP_CONTINUE;*/
+
+	WGPUShaderModuleDescriptor shader_mod_desc = {0};
+#ifdef WEBGPU_BACKEND_WGPU
+	shaderDesc.hintCount = 0;
+	shaderDesc.hints = nullptr;
+#endif
+
+	WGPUShaderSourceWGSL shader_code_desc = {0};
+	shader_code_desc.chain.next = NULL;
+	shader_code_desc.chain.sType = WGPUSType_ShaderSourceWGSL;
+
+	shader_code_desc.code.data = R"(
+		@vertex
+		fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
+		    var p = vec2f(0.0, 0.0);
+		    if (in_vertex_index == 0u) {
+		        p = vec2f(-0.5, -0.5);
+		    } else if (in_vertex_index == 1u) {
+		        p = vec2f(0.5, -0.5);
+		    } else {
+		        p = vec2f(0.0, 0.5);
+		    }
+		    return vec4f(p, 0.0, 1.0);
+		}
+		
+		@fragment
+		fn fs_main() -> @location(0) vec4f {
+		    return vec4f(0.0, 0.4, 1.0, 1.0);
+		}
+	)";
+	shader_code_desc.code.length = WGPU_STRLEN;
+
+	shader_mod_desc.nextInChain = &shader_code_desc.chain;
+
+	WGPUShaderModule shader_module = wgpuDeviceCreateShaderModule(state->device, &shader_mod_desc);
+
+	WGPURenderPipelineDescriptor render_pipe_desc = {0};
+	render_pipe_desc.nextInChain = NULL;
+	render_pipe_desc.vertex.bufferCount = 0;
+	render_pipe_desc.vertex.buffers = NULL;
+
+	render_pipe_desc.vertex.module = shader_module;
+	render_pipe_desc.vertex.entryPoint.data = "vs_main";
+	render_pipe_desc.vertex.entryPoint.length = 7;
+	render_pipe_desc.vertex.constantCount = 0;
+	render_pipe_desc.vertex.constants = NULL;
+	
+	render_pipe_desc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+	render_pipe_desc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
+	render_pipe_desc.primitive.frontFace = WGPUFrontFace_CCW;
+	render_pipe_desc.primitive.cullMode = WGPUCullMode_None;
+
+
+	WGPUFragmentState fragment_state = {0};
+	fragment_state.module = shader_module;
+	fragment_state.entryPoint.data = "fs_main";
+	fragment_state.entryPoint.length = 7;
+	fragment_state.constantCount = 0;
+	fragment_state.constants = NULL;
+
+	render_pipe_desc.fragment = &fragment_state;
+	render_pipe_desc.depthStencil = NULL;
+
+	WGPUBlendState blend_state = {0};
+
+	blend_state.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+	blend_state.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+	blend_state.color.operation = WGPUBlendOperation_Add;
+
+	WGPUColorTargetState color_target = {0};
+
+
+	color_target.format = caps.formats[0];
+	color_target.blend = &blend_state;
+	color_target.writeMask = WGPUColorWriteMask_All;
+
+	fragment_state.targetCount = 1;
+	fragment_state.targets = &color_target;
+	
+	render_pipe_desc.multisample.count = 1;
+	render_pipe_desc.multisample.mask = ~0u;
+	render_pipe_desc.multisample.alphaToCoverageEnabled = false;
+	
+	render_pipe_desc.layout = NULL;
+
+	state->pipeline = wgpuDeviceCreateRenderPipeline(state->device, &render_pipe_desc);
+	wgpuShaderModuleRelease(shader_module);
 	return SDL_APP_CONTINUE;
 }
 
@@ -224,6 +312,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	wgpuAdapterRelease(state->adapter);
 	wgpuDeviceRelease(state->device);
 	wgpuQueueRelease(state->queue);
+	wgpuRenderPipelineRelease(state->pipeline);
 }
 
 vec3 environment(vec3 direction) {
@@ -578,13 +667,19 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	render_pass_desc.colorAttachmentCount = 1;
 	render_pass_desc.colorAttachments = &col_attach;
 
-
 	WGPURenderPassEncoder render_pass = wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_desc);
+	
+	wgpuRenderPassEncoderSetPipeline(render_pass, state->pipeline);
+	wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
+
+
+
 	wgpuRenderPassEncoderEnd(render_pass);
 	wgpuRenderPassEncoderRelease(render_pass);
 
 
-	wgpuCommandEncoderInsertDebugMarker(encoder, dev_label);
+
+	//wgpuCommandEncoderInsertDebugMarker(encoder, dev_label);
 
 	WGPUCommandBufferDescriptor buf_desc = {0};
 	buf_desc.nextInChain = NULL;
