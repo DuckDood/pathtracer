@@ -38,6 +38,7 @@ struct program_state {
 	WGPUQueue queue;
 	WGPUSurface surf;
 	WGPURenderPipeline pipeline;
+	WGPUBuffer tri_buffer;
 };
 
 void on_webgpu_adapter_request_end(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView view, void * userdata1, void *userdata2) {
@@ -184,6 +185,40 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	return SDL_APP_CONTINUE;*/
 
+
+	float vertex_data[] = {
+		-0.5, -0.5,
+
+		+0.5, -0.5,
+
+		+0.0, +0.5 };
+
+	WGPUBufferDescriptor buffer_desc = {0};
+	buffer_desc.nextInChain = NULL;
+	buffer_desc.label.data = "gpubuffer";
+	buffer_desc.label.length = WGPU_STRLEN;
+	buffer_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+	buffer_desc.size = sizeof(vertex_data);
+	buffer_desc.mappedAtCreation = false;
+	state->tri_buffer = wgpuDeviceCreateBuffer(state->device, &buffer_desc);
+
+	wgpuQueueWriteBuffer(state->queue, state->tri_buffer, 0, vertex_data, buffer_desc.size);
+
+	WGPUVertexBufferLayout vertex_buffer_layout = {0};
+
+	WGPUVertexAttribute position_attribute;
+	position_attribute.shaderLocation = 0;
+	position_attribute.format = WGPUVertexFormat_Float32x2;
+	position_attribute.offset = 0;
+
+
+	vertex_buffer_layout.attributeCount = 1;
+	vertex_buffer_layout.attributes = &position_attribute;
+	vertex_buffer_layout.arrayStride = 2 * sizeof(float);
+	vertex_buffer_layout.stepMode = WGPUVertexStepMode_Vertex;
+
+	
+
 	WGPUShaderModuleDescriptor shader_mod_desc = {0};
 #ifdef WEBGPU_BACKEND_WGPU
 	shaderDesc.hintCount = 0;
@@ -196,16 +231,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	shader_code_desc.code.data = R"(
 		@vertex
-		fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
-		    var p = vec2f(0.0, 0.0);
-		    if (in_vertex_index == 0u) {
-		        p = vec2f(-0.5, -0.5);
-		    } else if (in_vertex_index == 1u) {
-		        p = vec2f(0.5, -0.5);
-		    } else {
-		        p = vec2f(0.0, 0.5);
-		    }
-		    return vec4f(p, 0.0, 1.0);
+		fn vs_main(@location(0) in_vertex_position: vec2f) -> @builtin(position) vec4f {
+    		return vec4f(in_vertex_position, 0.0, 1.0);
 		}
 		
 		@fragment
@@ -221,8 +248,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	WGPURenderPipelineDescriptor render_pipe_desc = {0};
 	render_pipe_desc.nextInChain = NULL;
-	render_pipe_desc.vertex.bufferCount = 0;
-	render_pipe_desc.vertex.buffers = NULL;
+	render_pipe_desc.vertex.bufferCount = 1;
+	render_pipe_desc.vertex.buffers = &vertex_buffer_layout;
 
 	render_pipe_desc.vertex.module = shader_module;
 	render_pipe_desc.vertex.entryPoint.data = "vs_main";
@@ -270,6 +297,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	state->pipeline = wgpuDeviceCreateRenderPipeline(state->device, &render_pipe_desc);
 	wgpuShaderModuleRelease(shader_module);
+
+
+
 	return SDL_APP_CONTINUE;
 }
 
@@ -308,6 +338,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 		SDL_DestroyWindow(state->window);
 	}
 
+	wgpuBufferRelease(state->tri_buffer);
 	wgpuSurfaceRelease(state->surf);
 	wgpuAdapterRelease(state->adapter);
 	wgpuDeviceRelease(state->device);
@@ -670,6 +701,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	WGPURenderPassEncoder render_pass = wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_desc);
 	
 	wgpuRenderPassEncoderSetPipeline(render_pass, state->pipeline);
+	wgpuRenderPassEncoderSetVertexBuffer(render_pass, 0, state->tri_buffer, 0, wgpuBufferGetSize(state->tri_buffer));
+
 	wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
 
 
