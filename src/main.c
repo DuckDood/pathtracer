@@ -15,8 +15,8 @@
 #include <webgpu/webgpu.h>
 #include <sdl3webgpu.h>
 
-#define WIDTH 800/2
-#define HEIGHT 600/2
+#define WIDTH 800
+#define HEIGHT 600
 
 typedef struct {
 	int width, height;
@@ -39,6 +39,13 @@ struct program_state {
 	WGPUSurface surf;
 	WGPURenderPipeline pipeline;
 	WGPUBuffer tri_buffer;
+
+	WGPUBuffer resolution_buffer;
+
+
+	WGPUBindGroupLayout bind_group_layout;
+	WGPUBindGroup bind_group;
+	WGPUPipelineLayout layout;
 };
 
 void on_webgpu_adapter_request_end(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView view, void * userdata1, void *userdata2) {
@@ -187,11 +194,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 
 	float vertex_data[] = {
-		-0.5, -0.5,
+		-5, -5,
 
-		+0.5, -0.5,
+		+5, -5,
 
-		+0.0, +0.5 };
+		+0.0, +5 };
 
 	WGPUBufferDescriptor buffer_desc = {0};
 	buffer_desc.nextInChain = NULL;
@@ -234,10 +241,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 		fn vs_main(@location(0) in_vertex_position: vec2f) -> @builtin(position) vec4f {
     		return vec4f(in_vertex_position, 0.0, 1.0);
 		}
-		
+
+		@group(0) @binding(0) var<uniform> resolution: vec2f;
 		@fragment
-		fn fs_main() -> @location(0) vec4f {
-		    return vec4f(0.0, 0.4, 1.0, 1.0);
+		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+		    //return vec4f(0.0, 0.4, 1.0, 1.0);
+		    return vec4f(pos.x / resolution.x, pos.y / resolution.y, 0.0, 1.0);
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
@@ -293,7 +302,70 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	render_pipe_desc.multisample.mask = ~0u;
 	render_pipe_desc.multisample.alphaToCoverageEnabled = false;
 	
-	render_pipe_desc.layout = NULL;
+	WGPUBufferDescriptor res_uni_desc = {0};
+	res_uni_desc.size = 4 * sizeof(float);
+	res_uni_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+	res_uni_desc.mappedAtCreation = false;
+
+	state->resolution_buffer = wgpuDeviceCreateBuffer(state->device, &res_uni_desc);
+	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
+
+	WGPUBindGroupLayoutEntry binding_layout = {0};
+	binding_layout.buffer.nextInChain = NULL;
+	binding_layout.buffer.type = WGPUBufferBindingType_Undefined;
+	binding_layout.buffer.hasDynamicOffset = false;
+
+/*	binding_layout.sampler.nextInChain = NULL;
+	binding_layout.sampler.type = WGPUSamplerBindingType_Undefined;
+
+	binding_layout.storageTexture.nextInChain = NULL;
+	binding_layout.storageTexture.access = WGPUStorageTextureAccess_Undefined;
+	binding_layout.storageTexture.format = WGPUTextureFormat_Undefined;
+	binding_layout.storageTexture.viewDimension = WGPUTextureViewDimension_Undefined;
+
+	binding_layout.texture.nextInChain = NULL;
+	binding_layout.texture.multisampled = false;
+	binding_layout.texture.sampleType = WGPUTextureSampleType_Undefined;
+	binding_layout.texture.viewDimension = WGPUTextureViewDimension_Undefined;*/
+
+	binding_layout.binding = 0;
+
+	binding_layout.visibility = WGPUShaderStage_Fragment;
+
+	binding_layout.buffer.type = WGPUBufferBindingType_Uniform;
+	binding_layout.buffer.minBindingSize = 4 * sizeof(float);
+
+	WGPUBindGroupLayoutDescriptor bind_group_lay_desc = {0};
+	bind_group_lay_desc.nextInChain = NULL;
+	bind_group_lay_desc.entryCount = 1;
+	bind_group_lay_desc.entries = &binding_layout;
+	state->bind_group_layout = wgpuDeviceCreateBindGroupLayout(state->device, &bind_group_lay_desc);
+
+	WGPUPipelineLayoutDescriptor layout_desc = {0};
+	layout_desc.nextInChain = NULL;
+	layout_desc.bindGroupLayoutCount = 1;
+	layout_desc.bindGroupLayouts = &state->bind_group_layout;
+	state->layout = wgpuDeviceCreatePipelineLayout(state->device, &layout_desc);
+
+	WGPUBindGroupEntry binding = {0};
+	binding.nextInChain = NULL;
+	binding.binding = 0;
+	binding.buffer = state->resolution_buffer;
+	binding.offset = 0;
+	binding.size = 4 * sizeof(float);
+
+
+
+	WGPUBindGroupDescriptor bind_group_desc = {0};
+	bind_group_desc.nextInChain = NULL;
+	bind_group_desc.layout = state->bind_group_layout;
+
+	bind_group_desc.entryCount = 1;
+	bind_group_desc.entries = &binding;
+	state->bind_group = wgpuDeviceCreateBindGroup(state->device, &bind_group_desc);
+
+
+	render_pipe_desc.layout = state->layout;
 
 	state->pipeline = wgpuDeviceCreateRenderPipeline(state->device, &render_pipe_desc);
 	wgpuShaderModuleRelease(shader_module);
@@ -339,10 +411,15 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 	}
 
 	wgpuBufferRelease(state->tri_buffer);
+	wgpuBufferRelease(state->resolution_buffer);
 	wgpuSurfaceRelease(state->surf);
 	wgpuAdapterRelease(state->adapter);
 	wgpuDeviceRelease(state->device);
 	wgpuQueueRelease(state->queue);
+
+	wgpuBindGroupRelease(state->bind_group);
+	wgpuPipelineLayoutRelease(state->layout);
+	wgpuBindGroupLayoutRelease(state->bind_group_layout);
 	wgpuRenderPipelineRelease(state->pipeline);
 }
 
@@ -702,6 +779,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	
 	wgpuRenderPassEncoderSetPipeline(render_pass, state->pipeline);
 	wgpuRenderPassEncoderSetVertexBuffer(render_pass, 0, state->tri_buffer, 0, wgpuBufferGetSize(state->tri_buffer));
+
+	wgpuRenderPassEncoderSetBindGroup(render_pass, 0, state->bind_group, 0, NULL);
 
 	wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
 
