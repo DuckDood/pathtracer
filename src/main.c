@@ -242,11 +242,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     		return vec4f(in_vertex_position, 0.0, 1.0);
 		}
 
-		@group(0) @binding(0) var<uniform> resolution: vec2f;
+		struct uniformData {
+			camMatrix: mat4x4<f32>,
+			resolution: vec2f
+		};
+
+		@group(0) @binding(0) var<uniform> uData: uniformData;
 		@fragment
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-		    //return vec4f(0.0, 0.4, 1.0, 1.0);
-		    return vec4f(pos.x / resolution.x, pos.y / resolution.y, 0.0, 1.0);
+			//var rayDirUnorm : vec4f = (uData.camMatrix * vec4f(pos.xy / vec2f(800,600) * 2.0 - 1.0, 1.0, 1.0));
+			var rayDirUnorm : vec4f = uData.camMatrix * vec4f(pos.xy / uData.resolution * 2.0 - 1.0, 1.0, 1.0);
+
+			var rayDir : vec3f = normalize(rayDirUnorm.xyz);
+		    return vec4f(rayDir, 1);
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
@@ -303,12 +311,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	render_pipe_desc.multisample.alphaToCoverageEnabled = false;
 	
 	WGPUBufferDescriptor res_uni_desc = {0};
-	res_uni_desc.size = 4 * sizeof(float);
+	res_uni_desc.size = 20 * sizeof(float);
 	res_uni_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	res_uni_desc.mappedAtCreation = false;
 
 	state->resolution_buffer = wgpuDeviceCreateBuffer(state->device, &res_uni_desc);
-	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
+	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &(mat4){0}, sizeof(float)*16);
+	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 16 * sizeof(float), (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
 
 	WGPUBindGroupLayoutEntry binding_layout = {0};
 	binding_layout.buffer.nextInChain = NULL;
@@ -333,7 +342,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	binding_layout.visibility = WGPUShaderStage_Fragment;
 
 	binding_layout.buffer.type = WGPUBufferBindingType_Uniform;
-	binding_layout.buffer.minBindingSize = 4 * sizeof(float);
+	binding_layout.buffer.minBindingSize = 20 * sizeof(float);
 
 	WGPUBindGroupLayoutDescriptor bind_group_lay_desc = {0};
 	bind_group_lay_desc.nextInChain = NULL;
@@ -347,12 +356,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	layout_desc.bindGroupLayouts = &state->bind_group_layout;
 	state->layout = wgpuDeviceCreatePipelineLayout(state->device, &layout_desc);
 
-	WGPUBindGroupEntry binding = {0};
-	binding.nextInChain = NULL;
-	binding.binding = 0;
-	binding.buffer = state->resolution_buffer;
-	binding.offset = 0;
-	binding.size = 4 * sizeof(float);
+	WGPUBindGroupEntry binding[2] = {{0}, {0}};
+	binding[0].nextInChain = NULL;
+	binding[0].binding = 0;
+	binding[0].buffer = state->resolution_buffer;
+	binding[0].offset = 0;
+	binding[0].size = 20 * sizeof(float);
 
 
 
@@ -361,7 +370,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	bind_group_desc.layout = state->bind_group_layout;
 
 	bind_group_desc.entryCount = 1;
-	bind_group_desc.entries = &binding;
+	bind_group_desc.entries = binding;
 	state->bind_group = wgpuDeviceCreateBindGroup(state->device, &bind_group_desc);
 
 
@@ -369,6 +378,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 	state->pipeline = wgpuDeviceCreateRenderPipeline(state->device, &render_pipe_desc);
 	wgpuShaderModuleRelease(shader_module);
+
+	state->cam_yaw = 0;
+	state->cam_pitch = 0;
 
 
 
@@ -392,8 +404,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 			}
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
-			state->cam_yaw += event->motion.xrel / state->pixels.height;
-			state->cam_pitch -= event->motion.yrel / state->pixels.height;
+			state->cam_yaw += event->motion.xrel / WIDTH;
+			state->cam_pitch -= event->motion.yrel / HEIGHT;
 			state->cam_pitch = fmax(state->cam_pitch, -M_PI/2);
 			state->cam_pitch = fmin(state->cam_pitch, M_PI/2);
 
@@ -561,7 +573,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		state->frame_accumulation_count = 0;
 	}
 
-	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
 
 	const tri tris[12] = {
 		// left face
@@ -776,6 +787,19 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	render_pass_desc.colorAttachments = &col_attach;
 
 	WGPURenderPassEncoder render_pass = wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_desc);
+
+	struct {
+		mat4 a;
+		vec4 b;
+	} uniform_data;
+
+	printf("yaw: %f, pit: %f\n", state->cam_yaw, state->cam_pitch);
+	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
+	uniform_data.a = rot_matrix;
+	uniform_data.b = (vec4){WIDTH, HEIGHT, 0, 0};
+	printf("uniform_data: %f\n", uniform_data.a.columns[0][0]);
+
+	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &uniform_data, sizeof(uniform_data));
 	
 	wgpuRenderPassEncoderSetPipeline(render_pass, state->pipeline);
 	wgpuRenderPassEncoderSetVertexBuffer(render_pass, 0, state->tri_buffer, 0, wgpuBufferGetSize(state->tri_buffer));
