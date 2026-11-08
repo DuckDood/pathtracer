@@ -258,24 +258,36 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 			direction: vec4f
 		}
 
-fn ray_sphere_intersection(r : ray, s : sphere) -> bool {
+		struct hitInfo {
+			normal: vec4f,
+			position: vec4f,
+			distance: f32,
+			hit: bool
+		}
+
+fn ray_sphere_intersection(r : ray, s : sphere) -> hitInfo {
 	var oc : vec4f = s.position - r.origin;
     var a : f32 = dot(r.direction, r.direction);
     var b : f32 = -2.0 * dot(r.direction, oc);
     var c : f32 = dot(oc, oc) - s.radius*s.radius;
     var discriminant : f32 = b*b - 4*a*c;
 
+	var info : hitInfo;
     if (discriminant < 0) {
-		return false;
+		info.hit = false;
     } else {
-        /*out.distance =  (-b - sqrt(discriminant) ) / (2.0*a);
-		out.normal = v3_norm(r.direction * out.distance + r.origin - s.position);
-		out.position = r.direction * out.distance + r.origin;
-		out.hit = 1;*/
-		return true;
+        info.distance =  (-b - sqrt(discriminant) ) / (2.0*a);
+		info.normal = normalize(r.direction * info.distance + r.origin - s.position);
+		info.position = r.direction * info.distance + r.origin;
+		info.hit = true;
     }
-	//return out;
+    info.hit &= info.distance > 0;
+	return info;
 }
+		const s : sphere = sphere(
+			vec4(0, 0, 4, 0),
+			1.0
+		);
 
 
 		@group(0) @binding(0) var<uniform> uData: uniformData;
@@ -284,9 +296,6 @@ fn ray_sphere_intersection(r : ray, s : sphere) -> bool {
 						/*float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
 			float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
 			vec4 ray_dir = m4_v4_mul(rot_matrix, (vec4){ndc_x, ndc_y, 1, 0});*/
-		var s : sphere;
-			s.position = vec4(0, 0, -4, 0);
-			s.radius = 1.0;
 
 			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
 			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
@@ -296,7 +305,7 @@ fn ray_sphere_intersection(r : ray, s : sphere) -> bool {
 			r.origin = uData.camPos;
 			r.direction = rayDir;
 
-			var hit : f32 = f32(ray_sphere_intersection(r, s));
+			var hit : f32 = f32(ray_sphere_intersection(r, s).hit);
 
 		    //return vec4f(normalize(rayDir.xyz), 1);
 		    return vec4f(hit, hit, hit, 1);
@@ -600,10 +609,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	if(kbd_state[SDL_SCANCODE_W]) {
 		//state->cam_pos[2] += 0.01;
-		state->cam_pos[0] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
-		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[0] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
+		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
 
 		state->frame_accumulation_count = 0;
 	}
@@ -611,10 +620,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	if(kbd_state[SDL_SCANCODE_S]) {
 		//state->cam_pos[2] -= 0.01;
 		//
-		state->cam_pos[0] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
-		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[0] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
+		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
 		state->frame_accumulation_count = 0;
 	}
 
