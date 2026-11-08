@@ -244,17 +244,62 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 
 		struct uniformData {
 			camMatrix: mat4x4<f32>,
+			camPos: vec4f,
 			resolution: vec2f
 		};
+
+		struct sphere {
+			position: vec4f,
+			radius: f32
+		};
+
+		struct ray {
+			origin: vec4f,
+			direction: vec4f
+		}
+
+fn ray_sphere_intersection(r : ray, s : sphere) -> bool {
+	var oc : vec4f = s.position - r.origin;
+    var a : f32 = dot(r.direction, r.direction);
+    var b : f32 = -2.0 * dot(r.direction, oc);
+    var c : f32 = dot(oc, oc) - s.radius*s.radius;
+    var discriminant : f32 = b*b - 4*a*c;
+
+    if (discriminant < 0) {
+		return false;
+    } else {
+        /*out.distance =  (-b - sqrt(discriminant) ) / (2.0*a);
+		out.normal = v3_norm(r.direction * out.distance + r.origin - s.position);
+		out.position = r.direction * out.distance + r.origin;
+		out.hit = 1;*/
+		return true;
+    }
+	//return out;
+}
+
 
 		@group(0) @binding(0) var<uniform> uData: uniformData;
 		@fragment
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-			//var rayDirUnorm : vec4f = (uData.camMatrix * vec4f(pos.xy / vec2f(800,600) * 2.0 - 1.0, 1.0, 1.0));
-			var rayDirUnorm : vec4f = uData.camMatrix * vec4f(pos.xy / uData.resolution * 2.0 - 1.0, 1.0, 1.0);
+						/*float ndc_x = ((float)x / state->pixels.width - 0.5) * 2;
+			float ndc_y = ((float)y / state->pixels.height - 0.5) * 2;
+			vec4 ray_dir = m4_v4_mul(rot_matrix, (vec4){ndc_x, ndc_y, 1, 0});*/
+		var s : sphere;
+			s.position = vec4(0, 0, -4, 0);
+			s.radius = 1.0;
 
-			var rayDir : vec3f = normalize(rayDirUnorm.xyz);
-		    return vec4f(rayDir, 1);
+			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
+			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
+			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f(ndcX, ndcY, 1.0)), 0.0);
+
+			var r: ray;
+			r.origin = uData.camPos;
+			r.direction = rayDir;
+
+			var hit : f32 = f32(ray_sphere_intersection(r, s));
+
+		    //return vec4f(normalize(rayDir.xyz), 1);
+		    return vec4f(hit, hit, hit, 1);
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
@@ -311,13 +356,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	render_pipe_desc.multisample.alphaToCoverageEnabled = false;
 	
 	WGPUBufferDescriptor res_uni_desc = {0};
-	res_uni_desc.size = 20 * sizeof(float);
+	res_uni_desc.size = 24 * sizeof(float);
 	res_uni_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	res_uni_desc.mappedAtCreation = false;
 
 	state->resolution_buffer = wgpuDeviceCreateBuffer(state->device, &res_uni_desc);
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &(mat4){0}, sizeof(float)*16);
-	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 16 * sizeof(float), (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
+	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 20 * sizeof(float), (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
 
 	WGPUBindGroupLayoutEntry binding_layout = {0};
 	binding_layout.buffer.nextInChain = NULL;
@@ -342,7 +387,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	binding_layout.visibility = WGPUShaderStage_Fragment;
 
 	binding_layout.buffer.type = WGPUBufferBindingType_Uniform;
-	binding_layout.buffer.minBindingSize = 20 * sizeof(float);
+	binding_layout.buffer.minBindingSize = 24 * sizeof(float);
 
 	WGPUBindGroupLayoutDescriptor bind_group_lay_desc = {0};
 	bind_group_lay_desc.nextInChain = NULL;
@@ -361,7 +406,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 	binding[0].binding = 0;
 	binding[0].buffer = state->resolution_buffer;
 	binding[0].offset = 0;
-	binding[0].size = 20 * sizeof(float);
+	binding[0].size = 24 * sizeof(float);
 
 
 
@@ -555,10 +600,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	if(kbd_state[SDL_SCANCODE_W]) {
 		//state->cam_pos[2] += 0.01;
-		state->cam_pos[0] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
-		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[0] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
+		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
 
 		state->frame_accumulation_count = 0;
 	}
@@ -566,10 +611,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	if(kbd_state[SDL_SCANCODE_S]) {
 		//state->cam_pos[2] -= 0.01;
 		//
-		state->cam_pos[0] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
-		state->cam_pos[2] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[0] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
 
-		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
+		state->cam_pos[1] -= sin(state->cam_pitch) * 0.1;
 		state->frame_accumulation_count = 0;
 	}
 
@@ -790,14 +835,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
 	struct {
 		mat4 a;
+		vec4 pos;
 		vec4 b;
 	} uniform_data;
 
-	printf("yaw: %f, pit: %f\n", state->cam_yaw, state->cam_pitch);
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
 	uniform_data.a = rot_matrix;
 	uniform_data.b = (vec4){WIDTH, HEIGHT, 0, 0};
-	printf("uniform_data: %f\n", uniform_data.a.columns[0][0]);
+	uniform_data.pos = state->cam_pos;
 
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &uniform_data, sizeof(uniform_data));
 	
