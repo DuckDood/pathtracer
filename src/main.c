@@ -405,13 +405,25 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 				//currentRay.direction = vec4(info.normal.xyz + rand_vec().xyz, 0.0);
 				//r->incoming_light += material.emissive_color * r->color;
 				//r->color *= material.color;
-				var mat : material = material(
-				vec3(1, 0, 0),
-				vec3(0,0,0),
-				vec3(1,1,1),
-				1,
-				0.5
-				);
+				
+				var mat : material;
+				if(sp == 0) {
+					mat = material(
+					vec3(1, 0, 0),
+					vec3(0,0,0),
+					vec3(1,1,1),
+					1,
+					0.5
+					);
+				} else {
+					mat = material(
+					vec3(0, 1, 0),
+					vec3(0,0,0),
+					vec3(1,1,1),
+					0.3,
+					0
+					);
+				}
 
 				var matRay : ray = material_bounce(mat, currentRay, info);
 
@@ -434,9 +446,10 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		@fragment
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
 			rngSeed = u32(pos.x  + pos.y * 2308);
+			var aspectRatio : f32 = uData.resolution.x / uData.resolution.y;
 			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
 			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
-			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f(ndcX, ndcY, 1.0)), 0.0);
+			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f(ndcX * aspectRatio, ndcY, 1.0)), 0.0);
 
 			var r: ray;
 			r.origin = uData.camPos;
