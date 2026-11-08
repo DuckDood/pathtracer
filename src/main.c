@@ -285,6 +285,13 @@ fn rand_in_sphere() -> vec3f {
 			radius: f32
 		};
 
+		struct tri {
+			vertex_a : vec3f,
+			vertex_b : vec3f,
+			vertex_c : vec3f,
+			mat : material
+		};
+
 		struct ray {
 			origin: vec4f,
 			direction: vec4f,
@@ -342,7 +349,7 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		
 			var sun : f32 = pow(dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
 		
-			//return vec3f(0);
+			return vec3f(0);
 			return ground + sky + sun;
 		}
 		
@@ -365,6 +372,64 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		    info.hit &= info.distance > 0;
 			return info;
 		}
+
+fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
+	var out : hitInfo;
+	var edge1 : vec3f = tri.vertex_b - tri.vertex_a;
+	var edge2 : vec3f = tri.vertex_c - tri.vertex_a;
+
+	var normal : vec3f = cross(edge1, edge2);
+
+	var FLT_EPSILON : f32 = 0.000001;
+
+	if(dot(normal, r.direction.xyz) > 0) {
+		out.hit = false;
+		return out;
+	}
+
+	var ray_cross_e2 : vec3f = cross(r.direction.xyz, edge2);
+
+	var det : f32 = dot(edge1, ray_cross_e2);
+
+	if(abs(det) < FLT_EPSILON) {
+		out.hit = false;
+		return out;
+	}
+
+	var inv_det : f32 = 1/det;
+
+	var s : vec3f = r.origin.xyz - tri.vertex_a;
+
+	var u : f32 = inv_det * dot(s, ray_cross_e2);
+
+	if(u < -FLT_EPSILON || u-1 > FLT_EPSILON) {
+		out.hit = false;
+		return out;
+	}
+
+	var s_cross_e1 : vec3f = cross(s, edge1);
+
+	var v : f32 = inv_det * dot(r.direction.xyz, s_cross_e1);
+
+	if (v < -FLT_EPSILON || u + v - 1 > FLT_EPSILON) {
+		out.hit = false;
+		return out;
+	}
+	
+	var t : f32 = inv_det * dot(edge2, s_cross_e1);
+
+	if(t > FLT_EPSILON) {
+		out.hit = true;
+		out.normal = vec4f(normalize(normal),0);
+		out.distance = t;
+		out.position = vec4f(r.direction.xyz * t + r.origin.xyz, 0);
+		return out;
+	}
+
+	out.hit = false;
+	return out;
+}
+
 		const sphereCount = 2;
 		const s : array<sphere,sphereCount> = array(
 		sphere(
@@ -376,22 +441,190 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 			1.0
 		),
 		);
+	const triCount = 12;
+	const tris : array<tri, 12> = array(
+		// left face
+		tri(
+			vec3(-1, 1, -1),
+			vec3(-1, -1, 1),
+			vec3(-1, -1, -1),
+			material(
+				vec3(1, 0, 0),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(-1, 1, -1),
+			vec3(-1, 1, 1),
+			vec3(-1, -1, 1),
+			material(
+				vec3(1, 0, 0),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+
+		// right face
+		tri(
+			vec3(1, -1, -1),
+			vec3(1, -1, 1),
+			vec3(1, 1, -1),
+			material(
+				vec3(0, 1, 0),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(1, -1, 1),
+			vec3(1, 1, 1),
+			vec3(1, 1, -1),
+			material(
+				vec3(0, 1, 0),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		// back face
+		tri(
+			vec3(-1, -1, -1),
+			vec3(1, 1, -1),
+			vec3(-1, 1, -1),
+			material(
+				vec3(0, 0, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(-1, -1, -1),
+			vec3(1, -1, -1),
+			vec3(1, 1, -1),
+			material(
+				vec3(0, 0, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		// top face
+		tri(
+			vec3(-1, -1, -1),
+			vec3(-1, -1, 1),
+			vec3(1, -1, 1),
+			material(
+				vec3(1, 1, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(1, -1, 1),
+			vec3(1, -1, -1),
+			vec3(-1, -1, -1),
+			material(
+				vec3(1, 1, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		// bottom face
+		tri(
+			vec3(-1, 1, -1),
+			vec3(1, 1, 1),
+			vec3(-1, 1, 1),
+			material(
+				vec3(1, 1, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(-1, 1, -1),
+			vec3(1, 1, -1),
+			vec3(1, 1, 1),
+			material(
+				vec3(1, 1, 1),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+			)
+
+		),
+
+		// top face
+		tri(
+			vec3(-1, -1.1, -1) * 0.75f,
+			vec3(-1, -1.1, 1) * 0.75f,
+			vec3(1, -1.1, 1) * 0.75f,
+			material(
+				vec3(0, 0, 0),
+				vec3(2,2,2),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		),
+
+		tri(
+			vec3(1, -1.1, 1) * 0.75f,
+			vec3(1, -1.1, -1) * 0.75f,
+			vec3(-1, -1.1, -1) * 0.75f,
+			material(
+				vec3(0, 0, 0),
+				vec3(2,2,2),
+				vec3(0,0,0),
+				0,
+				0
+			)
+		)
+		);
 
 		fn trace(r : ray) -> vec3f {
 			var currentRay : ray = r;
-			var bounceCount : u32 = 10;
+			var bounceCount : u32 = 5;
 			currentRay.color = vec3f(1);
 			currentRay.incomingLight = vec3f(0);
 
-			for(var bounce : u32 = 0; bounce < bounceCount; bounce++) {
+			for(var bounce : u32 = 0; bounce <= bounceCount; bounce++) {
 				var info : hitInfo;
+				var mat : material;
 				info.hit = false;
 				info.distance = -1;
 				var sp : u32 = 0;
-				for(var i : u32 = 0; i < sphereCount; i++) {
-					var localInfo : hitInfo = ray_sphere_intersection(currentRay, s[i]);
+				for(var i : u32 = 0; i < triCount; i++) {
+					var localInfo : hitInfo = ray_tri_intersection(currentRay, tris[i]);
 					if(localInfo.hit && (info.distance < 0 || localInfo.distance < info.distance)) {
 						info = localInfo;
+						mat = tris[i].mat;
 					sp = i;
 					}
 				}
@@ -406,24 +639,23 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 				//r->incoming_light += material.emissive_color * r->color;
 				//r->color *= material.color;
 				
-				var mat : material;
-				if(sp == 0) {
+				/*if(sp >= 10) {
 					mat = material(
 					vec3(1, 0, 0),
-					vec3(0,0,0),
+					vec3(1,1,1),
 					vec3(1,1,1),
 					1,
 					0.5
 					);
 				} else {
 					mat = material(
-					vec3(0, 1, 0),
+					vec3(1, 1, 1),
 					vec3(0,0,0),
 					vec3(1,1,1),
 					0.3,
 					0
 					);
-				}
+				}*/
 
 				var matRay : ray = material_bounce(mat, currentRay, info);
 
@@ -466,7 +698,7 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		    	//return vec4f(0,0,0, 1);
 		    	return vec4f(sample_env_light(r.direction.xyz), 1);
 			}*/
-			const raysPerPixel : u32 = 50;
+			const raysPerPixel : u32 = 10;
 			var finalColor : vec4f = vec4f(0);
 			for(var i : u32; i < raysPerPixel; i++) {
 				finalColor += vec4f(trace(r), 1.0) / f32(raysPerPixel);
