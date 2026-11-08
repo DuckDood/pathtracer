@@ -312,9 +312,11 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 	var r : ray = paramRay;
 	if(hash() < material.specularity) {
 		var reflection_fuzz : vec3f = rand_in_sphere();
-		var reflection : vec3f = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz + reflection_fuzz * material.roughness);
+		//var reflection : vec3f = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz + reflection_fuzz * material.roughness);
+		var reflection : vec3f = normalize(reflect(r.direction.xyz, info.normal.xyz) + reflection_fuzz * material.roughness);
 		if(dot(reflection, info.normal.xyz) < 0) {
-			reflection = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz - reflection_fuzz * material.roughness);
+			//reflection = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz - reflection_fuzz * material.roughness);
+			reflection = normalize(reflect(r.direction.xyz, info.normal.xyz) - reflection_fuzz * material.roughness);
 		}
 		r.direction = vec4f(reflection, 0.0);
 		var emitted_light : vec3f = material.emissive_color;
@@ -325,6 +327,7 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		r.incomingLight += material.emissive_color * r.color;
 		r.color *= material.color;
 	}
+	r.origin = info.position;
 	return r;
 }
 
@@ -397,20 +400,24 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 					currentRay.incomingLight += sample_env_light(currentRay.direction.xyz) * currentRay.color;
 					break;
 				}
-				currentRay.origin = info.position;
+				//currentRay.origin = info.position;
 				//currentRay.direction = vec4(reflect(currentRay.direction.xyz, info.normal.xyz).xyz, 0.0);
-				currentRay.direction = vec4(info.normal.xyz + rand_vec().xyz, 0.0);
+				//currentRay.direction = vec4(info.normal.xyz + rand_vec().xyz, 0.0);
 				//r->incoming_light += material.emissive_color * r->color;
 				//r->color *= material.color;
 				var mat : material = material(
 				vec3(1, 0, 0),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
-				0
+				vec3(1,1,1),
+				1,
+				0.5
 				);
 
-				currentRay = material_bounce(mat, currentRay, info);
+				var matRay : ray = material_bounce(mat, currentRay, info);
+
+				var cDir : vec3f = currentRay.direction.xyz;
+				currentRay = matRay;
+				//currentRay.direction = (reflect(cDir, info.normal.xyz), 0.0);
 				/*if(sp == 1) {
 					currentRay.incomingLight += vec3f(1, 1, 1) * currentRay.color;
 					currentRay.color *= vec3f(0);
@@ -446,7 +453,12 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 		    	//return vec4f(0,0,0, 1);
 		    	return vec4f(sample_env_light(r.direction.xyz), 1);
 			}*/
-			return vec4f(trace(r), 1.0);
+			const raysPerPixel : u32 = 50;
+			var finalColor : vec4f = vec4f(0);
+			for(var i : u32; i < raysPerPixel; i++) {
+				finalColor += vec4f(trace(r), 1.0) / f32(raysPerPixel);
+			}
+			return finalColor;
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
