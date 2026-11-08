@@ -264,43 +264,75 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 			distance: f32,
 			hit: bool
 		}
-fn sample_env_light(direction : vec3f) -> vec3f {
-	var ground_col : vec3f = vec3f(0.2, 0.2, 0.2);
-	var sky_col : vec3f = vec3f(0.8, 0.8, 1) * 0.8f;
-	sky_col += sky_col * (1-min(1-direction[1], 2) / 2) * 1.f;
-	var ground : vec3f = ground_col * f32(direction[1] > 0);
-	var sky : vec3f = sky_col * f32(!(direction[1] > 0));
 
-	var sun_dir : vec3f = normalize(vec3f(-1, -1, -0.2));
-
-	var sun : f32 = pow(dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
-
-	return ground + sky + sun;
-}
-
-fn ray_sphere_intersection(r : ray, s : sphere) -> hitInfo {
-	var oc : vec4f = s.position - r.origin;
-    var a : f32 = dot(r.direction, r.direction);
-    var b : f32 = -2.0 * dot(r.direction, oc);
-    var c : f32 = dot(oc, oc) - s.radius*s.radius;
-    var discriminant : f32 = b*b - 4*a*c;
-
-	var info : hitInfo;
-    if (discriminant < 0) {
-		info.hit = false;
-    } else {
-        info.distance =  (-b - sqrt(discriminant) ) / (2.0*a);
-		info.normal = normalize(r.direction * info.distance + r.origin - s.position);
-		info.position = r.direction * info.distance + r.origin;
-		info.hit = true;
-    }
-    info.hit &= info.distance > 0;
-	return info;
-}
-		const s : sphere = sphere(
+		fn sample_env_light(direction : vec3f) -> vec3f {
+			var ground_col : vec3f = vec3f(0.2, 0.2, 0.2);
+			var sky_col : vec3f = vec3f(0.8, 0.8, 1) * 0.8f;
+			sky_col += sky_col * (1-min(1-direction[1], 2) / 2) * 1.f;
+			var ground : vec3f = ground_col * f32(direction[1] > 0) * (1-direction.y);
+			var sky : vec3f = sky_col * f32(!(direction[1] > 0));
+		
+			var sun_dir : vec3f = normalize(vec3f(-1, -1, -0.2));
+		
+			var sun : f32 = pow(dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
+		
+			return ground + sky + sun;
+		}
+		
+		fn ray_sphere_intersection(r : ray, s : sphere) -> hitInfo {
+			var oc : vec4f = s.position - r.origin;
+		    var a : f32 = dot(r.direction, r.direction);
+		    var b : f32 = -2.0 * dot(r.direction, oc);
+		    var c : f32 = dot(oc, oc) - s.radius*s.radius;
+		    var discriminant : f32 = b*b - 4*a*c;
+		
+			var info : hitInfo;
+		    if (discriminant < 0) {
+				info.hit = false;
+		    } else {
+		        info.distance =  (-b - sqrt(discriminant) ) / (2.0*a);
+				info.normal = normalize(r.direction * info.distance + r.origin - s.position);
+				info.position = r.direction * info.distance + r.origin;
+				info.hit = true;
+		    }
+		    info.hit &= info.distance > 0;
+			return info;
+		}
+		const sphereCount = 2;
+		const s : array<sphere,sphereCount> = array(
+		sphere(
 			vec4(0, 0, 4, 0),
 			1.0
+		),
+		sphere(
+			vec4(0, -2, 4, 0),
+			1.0
+		),
 		);
+
+		fn trace(r : ray) -> vec3f {
+			var currentRay : ray = r;
+			var bounceCount : u32 = 10;
+			var rayCol : vec3f = vec3f(0);
+			for(var bounce : u32 = 0; bounce < bounceCount; bounce++) {
+				var info : hitInfo;
+				info.hit = false;
+				info.distance = -1;
+				for(var i : u32 = 0; i < sphereCount; i++) {
+					var localInfo : hitInfo = ray_sphere_intersection(currentRay, s[i]);
+					if(localInfo.hit && (info.distance < 0 || localInfo.distance < info.distance)) {
+						info = localInfo;
+					}
+				}
+				if(!info.hit) {
+					break;
+				}
+				currentRay.origin = info.position;
+				currentRay.direction = reflect(currentRay.direction, info.normal);
+				rayCol += 0.1;
+			}
+			return rayCol;
+		}
 
 
 		@group(0) @binding(0) var<uniform> uData: uniformData;
@@ -314,7 +346,8 @@ fn ray_sphere_intersection(r : ray, s : sphere) -> hitInfo {
 			r.origin = uData.camPos;
 			r.direction = vec4f(normalize(rayDir.xyz), 0.0);
 
-			var info : hitInfo = ray_sphere_intersection(r, s);
+			/*
+			var info : hitInfo = ray_sphere_intersection(r, s[0]);
 
 		    //return vec4f(normalize(rayDir.xyz), 1);
 			if(info.hit) {
@@ -323,7 +356,8 @@ fn ray_sphere_intersection(r : ray, s : sphere) -> hitInfo {
 			} else {
 		    	//return vec4f(0,0,0, 1);
 		    	return vec4f(sample_env_light(r.direction.xyz), 1);
-			}
+			}*/
+			return vec4f(trace(r), 1.0);
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
