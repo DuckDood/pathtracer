@@ -269,11 +269,10 @@ fn rand_vec() -> vec3f {
 	return normalize(vec);
 }
 
-/*vec3 rand_in_sphere(uint32_t *rng_seed) {
-	vec3 direction = rand_vec(rng_seed);
+fn rand_in_sphere() -> vec3f {
 
-	return direction * (float)cbrt(hash(rng_seed));
-}*/
+	return rand_vec() * pow(hash(), 1.0/3.0);
+}
 
 		struct uniformData {
 			camMatrix: mat4x4<f32>,
@@ -288,7 +287,9 @@ fn rand_vec() -> vec3f {
 
 		struct ray {
 			origin: vec4f,
-			direction: vec4f
+			direction: vec4f,
+			incomingLight: vec3f,
+			color: vec3f
 		}
 
 		struct hitInfo {
@@ -297,6 +298,35 @@ fn rand_vec() -> vec3f {
 			distance: f32,
 			hit: bool
 		}
+
+		struct material {
+			color : vec3f,
+			emissive_color : vec3f,
+			specular_color : vec3f,
+			roughness : f32,
+			specularity : f32,
+		};
+
+
+fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
+	var r : ray = paramRay;
+	if(hash() < material.specularity) {
+		var reflection_fuzz : vec3f = rand_in_sphere();
+		var reflection : vec3f = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz + reflection_fuzz * material.roughness);
+		if(dot(reflection, info.normal.xyz) < 0) {
+			reflection = normalize(r.direction.xyz - 2 * dot(r.direction.xyz, info.normal.xyz) * info.normal.xyz - reflection_fuzz * material.roughness);
+		}
+		r.direction = vec4f(reflection, 0.0);
+		var emitted_light : vec3f = material.emissive_color;
+		r.incomingLight += emitted_light * r.color;
+		r.color *= material.specular_color;
+	} else {
+		r.direction = vec4f(normalize(rand_vec() + info.normal.xyz), 0.0);
+		r.incomingLight += material.emissive_color * r.color;
+		r.color *= material.color;
+	}
+	return r;
+}
 
 		fn sample_env_light(direction : vec3f) -> vec3f {
 			var ground_col : vec3f = vec3f(0.2, 0.2, 0.2);
@@ -309,7 +339,7 @@ fn rand_vec() -> vec3f {
 		
 			var sun : f32 = pow(dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
 		
-			return vec3f(0);
+			//return vec3f(0);
 			return ground + sky + sun;
 		}
 		
@@ -347,8 +377,8 @@ fn rand_vec() -> vec3f {
 		fn trace(r : ray) -> vec3f {
 			var currentRay : ray = r;
 			var bounceCount : u32 = 10;
-			var rayCol : vec3f = vec3f(1);
-			var incomingLight : vec3f = vec3f(0);
+			currentRay.color = vec3f(1);
+			currentRay.incomingLight = vec3f(0);
 
 			for(var bounce : u32 = 0; bounce < bounceCount; bounce++) {
 				var info : hitInfo;
@@ -364,7 +394,7 @@ fn rand_vec() -> vec3f {
 				}
 				if(!info.hit) {
 					//return sample_env_light(currentRay.direction.xyz);
-					incomingLight += sample_env_light(currentRay.direction.xyz) * rayCol;
+					currentRay.incomingLight += sample_env_light(currentRay.direction.xyz) * currentRay.color;
 					break;
 				}
 				currentRay.origin = info.position;
@@ -372,15 +402,24 @@ fn rand_vec() -> vec3f {
 				currentRay.direction = vec4(info.normal.xyz + rand_vec().xyz, 0.0);
 				//r->incoming_light += material.emissive_color * r->color;
 				//r->color *= material.color;
-				if(sp == 1) {
-					incomingLight += vec3f(1, 1, 1) * rayCol;
-					rayCol *= vec3f(0);
+				var mat : material = material(
+				vec3(1, 0, 0),
+				vec3(0,0,0),
+				vec3(0,0,0),
+				0,
+				0
+				);
+
+				currentRay = material_bounce(mat, currentRay, info);
+				/*if(sp == 1) {
+					currentRay.incomingLight += vec3f(1, 1, 1) * currentRay.color;
+					currentRay.color *= vec3f(0);
 					//incomingLight += 0.001;
 				} else {
-					rayCol *= vec3f(0.8, 0.6, 0.1);
-				}
+					currentRay.color *= vec3f(0.8, 0.6, 0.1);
+				}*/
 			}
-			return incomingLight;
+			return currentRay.incomingLight;
 		}
 
 
