@@ -242,6 +242,39 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     		return vec4f(in_vertex_position, 0.0, 1.0);
 		}
 
+	var<private> rngSeed : u32;
+
+fn hash() -> f32 {
+	var state : u32 = rngSeed;
+	state *= state * 747796405 + 2891336453;
+	var result : u32 = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+	result = (result >> 22) ^ result;
+	rngSeed = state;
+	return f32(result) / 4294967295.0;
+}
+
+fn normal_hash() -> f32
+{
+    // Thanks to https://stackoverflow.com/a/6178290
+    var theta : f32 = 2 * 3.1415926 * hash();
+    var rho : f32 = sqrt(-2 * log(hash()));
+    return rho * cos(theta);
+}
+
+fn rand_vec() -> vec3f {
+	var vec : vec3f;
+	vec[0] = normal_hash() * 2 - 1;
+	vec[1] = normal_hash() * 2 - 1;
+	vec[2] = normal_hash() * 2 - 1;
+	return normalize(vec);
+}
+
+/*vec3 rand_in_sphere(uint32_t *rng_seed) {
+	vec3 direction = rand_vec(rng_seed);
+
+	return direction * (float)cbrt(hash(rng_seed));
+}*/
+
 		struct uniformData {
 			camMatrix: mat4x4<f32>,
 			camPos: vec4f,
@@ -276,6 +309,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 		
 			var sun : f32 = pow(dot(sun_dir, direction) * 0.5 + 0.5, 300) * 10;
 		
+			return vec3f(0);
 			return ground + sky + sun;
 		}
 		
@@ -313,31 +347,47 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
 		fn trace(r : ray) -> vec3f {
 			var currentRay : ray = r;
 			var bounceCount : u32 = 10;
-			var rayCol : vec3f = vec3f(0);
+			var rayCol : vec3f = vec3f(1);
+			var incomingLight : vec3f = vec3f(0);
+
 			for(var bounce : u32 = 0; bounce < bounceCount; bounce++) {
 				var info : hitInfo;
 				info.hit = false;
 				info.distance = -1;
+				var sp : u32 = 0;
 				for(var i : u32 = 0; i < sphereCount; i++) {
 					var localInfo : hitInfo = ray_sphere_intersection(currentRay, s[i]);
 					if(localInfo.hit && (info.distance < 0 || localInfo.distance < info.distance)) {
 						info = localInfo;
+					sp = i;
 					}
 				}
 				if(!info.hit) {
+					//return sample_env_light(currentRay.direction.xyz);
+					incomingLight += sample_env_light(currentRay.direction.xyz) * rayCol;
 					break;
 				}
 				currentRay.origin = info.position;
-				currentRay.direction = reflect(currentRay.direction, info.normal);
-				rayCol += 0.1;
+				//currentRay.direction = vec4(reflect(currentRay.direction.xyz, info.normal.xyz).xyz, 0.0);
+				currentRay.direction = vec4(info.normal.xyz + rand_vec().xyz, 0.0);
+				//r->incoming_light += material.emissive_color * r->color;
+				//r->color *= material.color;
+				if(sp == 1) {
+					incomingLight += vec3f(1, 1, 1) * rayCol;
+					rayCol *= vec3f(0);
+					//incomingLight += 0.001;
+				} else {
+					rayCol *= vec3f(0.8, 0.6, 0.1);
+				}
 			}
-			return rayCol;
+			return incomingLight;
 		}
 
 
 		@group(0) @binding(0) var<uniform> uData: uniformData;
 		@fragment
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+			rngSeed = u32(pos.x  + pos.y * 2308);
 			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
 			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
 			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f(ndcX, ndcY, 1.0)), 0.0);
