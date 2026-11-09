@@ -73,9 +73,9 @@ endif
 
 build/pathtrace: obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o 
 ifeq (${OSMODE}, l)
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -lwgpu_native
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -L. -lwgpu_native
 else
-	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -lwgpu_native
+	${CXX} obj/main.c.o obj/vectors.c.o obj/transformations.c.o obj/shapes.c.o obj/material.c.o obj/randoms.c.o obj/sdl3webgpu.c.o -o build/pathtrace ${LDFLAGS} -fopenmp -lSDL3 -L. -lwgpu_native
 endif
 
 
