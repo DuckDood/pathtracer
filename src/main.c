@@ -42,6 +42,8 @@ struct program_state {
 
 	WGPUBuffer resolution_buffer;
 
+	WGPUBuffer screen_buffer;
+
 
 	WGPUBindGroupLayout bind_group_layout;
 	WGPUBindGroup bind_group;
@@ -277,7 +279,8 @@ fn rand_in_sphere() -> vec3f {
 		struct uniformData {
 			camMatrix: mat4x4<f32>,
 			camPos: vec4f,
-			resolution: vec2f
+			resolution: vec2f,
+			frameNum : u32
 		};
 
 		struct sphere {
@@ -286,9 +289,9 @@ fn rand_in_sphere() -> vec3f {
 		};
 
 		struct tri {
-			vertex_a : vec3f,
-			vertex_b : vec3f,
-			vertex_c : vec3f,
+			vertex_a : vec4f,
+			vertex_b : vec4f,
+			vertex_c : vec4f,
 			mat : material
 		};
 
@@ -375,8 +378,8 @@ fn material_bounce(material : material, paramRay : ray, info: hitInfo) -> ray {
 
 fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	var out : hitInfo;
-	var edge1 : vec3f = tri.vertex_b - tri.vertex_a;
-	var edge2 : vec3f = tri.vertex_c - tri.vertex_a;
+	var edge1 : vec3f = tri.vertex_b.xyz - tri.vertex_a.xyz;
+	var edge2 : vec3f = tri.vertex_c.xyz - tri.vertex_a.xyz;
 
 	var normal : vec3f = cross(edge1, edge2);
 
@@ -398,7 +401,7 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 	var inv_det : f32 = 1/det;
 
-	var s : vec3f = r.origin.xyz - tri.vertex_a;
+	var s : vec3f = r.origin.xyz - tri.vertex_a.xyz;
 
 	var u : f32 = inv_det * dot(s, ray_cross_e2);
 
@@ -445,9 +448,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	const tris : array<tri, 12> = array(
 		// left face
 		tri(
-			vec3(-1, 1, -1),
-			vec3(-1, -1, 1),
-			vec3(-1, -1, -1),
+			vec4(-1, 1, -1, 0),
+			vec4(-1, -1, 1, 0),
+			vec4(-1, -1, -1, 0),
 			material(
 				vec3(1, 0, 0),
 				vec3(0,0,0),
@@ -458,9 +461,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(-1, 1, -1),
-			vec3(-1, 1, 1),
-			vec3(-1, -1, 1),
+			vec4(-1, 1, -1, 0),
+			vec4(-1, 1, 1, 0),
+			vec4(-1, -1, 1, 0),
 			material(
 				vec3(1, 0, 0),
 				vec3(0,0,0),
@@ -473,9 +476,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 		// right face
 		tri(
-			vec3(1, -1, -1),
-			vec3(1, -1, 1),
-			vec3(1, 1, -1),
+			vec4(1, -1, -1, 0),
+			vec4(1, -1, 1, 0),
+			vec4(1, 1, -1, 0),
 			material(
 				vec3(0, 1, 0),
 				vec3(0,0,0),
@@ -486,9 +489,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(1, -1, 1),
-			vec3(1, 1, 1),
-			vec3(1, 1, -1),
+			vec4(1, -1, 1, 0),
+			vec4(1, 1, 1, 0),
+			vec4(1, 1, -1, 0),
 			material(
 				vec3(0, 1, 0),
 				vec3(0,0,0),
@@ -500,9 +503,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 		// back face
 		tri(
-			vec3(-1, -1, -1),
-			vec3(1, 1, -1),
-			vec3(-1, 1, -1),
+			vec4(-1, -1, -1, 0),
+			vec4(1, 1, -1, 0),
+			vec4(-1, 1, -1, 0),
 			material(
 				vec3(0, 0, 1),
 				vec3(0,0,0),
@@ -513,9 +516,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(-1, -1, -1),
-			vec3(1, -1, -1),
-			vec3(1, 1, -1),
+			vec4(-1, -1, -1, 0),
+			vec4(1, -1, -1, 0),
+			vec4(1, 1, -1, 0),
 			material(
 				vec3(0, 0, 1),
 				vec3(0,0,0),
@@ -527,9 +530,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 		// top face
 		tri(
-			vec3(-1, -1, -1),
-			vec3(-1, -1, 1),
-			vec3(1, -1, 1),
+			vec4(-1, -1, -1, 0),
+			vec4(-1, -1, 1, 0),
+			vec4(1, -1, 1, 0),
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
@@ -540,9 +543,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(1, -1, 1),
-			vec3(1, -1, -1),
-			vec3(-1, -1, -1),
+			vec4(1, -1, 1, 0),
+			vec4(1, -1, -1, 0),
+			vec4(-1, -1, -1, 0),
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
@@ -554,9 +557,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 		// bottom face
 		tri(
-			vec3(-1, 1, -1),
-			vec3(1, 1, 1),
-			vec3(-1, 1, 1),
+			vec4(-1, 1, -1, 0),
+			vec4(1, 1, 1, 0),
+			vec4(-1, 1, 1, 0),
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
@@ -567,9 +570,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(-1, 1, -1),
-			vec3(1, 1, -1),
-			vec3(1, 1, 1),
+			vec4(-1, 1, -1, 0),
+			vec4(1, 1, -1, 0),
+			vec4(1, 1, 1, 0),
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
@@ -582,9 +585,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 		// top face
 		tri(
-			vec3(-1, -1.1, -1) * 0.75f,
-			vec3(-1, -1.1, 1) * 0.75f,
-			vec3(1, -1.1, 1) * 0.75f,
+			vec4(-1, -1.1, -1, 0) * 0.75f,
+			vec4(-1, -1.1, 1, 0) * 0.75f,
+			vec4(1, -1.1, 1, 0) * 0.75f,
 			material(
 				vec3(0, 0, 0),
 				vec3(2,2,2),
@@ -595,9 +598,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		),
 
 		tri(
-			vec3(1, -1.1, 1) * 0.75f,
-			vec3(1, -1.1, -1) * 0.75f,
-			vec3(-1, -1.1, -1) * 0.75f,
+			vec4(1, -1.1, 1, 0) * 0.75f,
+			vec4(1, -1.1, -1, 0) * 0.75f,
+			vec4(-1, -1.1, -1, 0) * 0.75f,
 			material(
 				vec3(0, 0, 0),
 				vec3(2,2,2),
@@ -675,9 +678,10 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 
 
 		@group(0) @binding(0) var<uniform> uData: uniformData;
+		@group(0) @binding(1) var<storage, read_write> screenBuffer: array<f32>;
 		@fragment
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-			rngSeed = u32(pos.x  + pos.y * 2308);
+			rngSeed = u32(pos.x  + pos.y * 2308) + uData.frameNum * 52342;
 			var aspectRatio : f32 = uData.resolution.x / uData.resolution.y;
 			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
 			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
@@ -703,7 +707,25 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			for(var i : u32; i < raysPerPixel; i++) {
 				finalColor += vec4f(trace(r), 1.0) / f32(raysPerPixel);
 			}
-			return finalColor;
+
+			var weight : f32 = 1/f32(uData.frameNum + 1);
+
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 0] *= 1-weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 1] *= 1-weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 2] *= 1-weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3] *= 1-weight;
+
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 0] += finalColor[0] * weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 1] += finalColor[1] * weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 2] += finalColor[2] * weight;
+			screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3] += finalColor[3] * weight;
+			//return finalColor;
+			return vec4f(
+screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 0],
+screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 1],
+screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 2],
+screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3]
+					);
 		}
 	)";
 	shader_code_desc.code.length = WGPU_STRLEN;
@@ -760,7 +782,7 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	render_pipe_desc.multisample.alphaToCoverageEnabled = false;
 	
 	WGPUBufferDescriptor res_uni_desc = {0};
-	res_uni_desc.size = 24 * sizeof(float);
+	res_uni_desc.size = 25 * sizeof(float);
 	res_uni_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
 	res_uni_desc.mappedAtCreation = false;
 
@@ -768,35 +790,68 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &(mat4){0}, sizeof(float)*16);
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 20 * sizeof(float), (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
 
-	WGPUBindGroupLayoutEntry binding_layout = {0};
-	binding_layout.buffer.nextInChain = NULL;
-	binding_layout.buffer.type = WGPUBufferBindingType_Undefined;
-	binding_layout.buffer.hasDynamicOffset = false;
+	WGPUBufferDescriptor screen_buf_desc = {0};
+	screen_buf_desc.size = 800 * 600 * 4 * sizeof(float);
+	screen_buf_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
+	screen_buf_desc.mappedAtCreation = false;
 
-/*	binding_layout.sampler.nextInChain = NULL;
-	binding_layout.sampler.type = WGPUSamplerBindingType_Undefined;
+	state->screen_buffer = wgpuDeviceCreateBuffer(state->device, &screen_buf_desc);
 
-	binding_layout.storageTexture.nextInChain = NULL;
-	binding_layout.storageTexture.access = WGPUStorageTextureAccess_Undefined;
-	binding_layout.storageTexture.format = WGPUTextureFormat_Undefined;
-	binding_layout.storageTexture.viewDimension = WGPUTextureViewDimension_Undefined;
+	WGPUBindGroupLayoutEntry binding_layout[2] = {{0}, {0}};
+	binding_layout[0].buffer.nextInChain = NULL;
+	binding_layout[0].buffer.type = WGPUBufferBindingType_Undefined;
+	binding_layout[0].buffer.hasDynamicOffset = false;
 
-	binding_layout.texture.nextInChain = NULL;
-	binding_layout.texture.multisampled = false;
-	binding_layout.texture.sampleType = WGPUTextureSampleType_Undefined;
-	binding_layout.texture.viewDimension = WGPUTextureViewDimension_Undefined;*/
+/*	binding_layout[0].sampler.nextInChain = NULL;
+	binding_layout[0].sampler.type = WGPUSamplerBindingType_Undefined;
 
-	binding_layout.binding = 0;
+	binding_layout[0].storageTexture.nextInChain = NULL;
+	binding_layout[0].storageTexture.access = WGPUStorageTextureAccess_Undefined;
+	binding_layout[0].storageTexture.format = WGPUTextureFormat_Undefined;
+	binding_layout[0].storageTexture.viewDimension = WGPUTextureViewDimension_Undefined;
 
-	binding_layout.visibility = WGPUShaderStage_Fragment;
+	binding_layout[0].texture.nextInChain = NULL;
+	binding_layout[0].texture.multisampled = false;
+	binding_layout[0].texture.sampleType = WGPUTextureSampleType_Undefined;
+	binding_layout[0].texture.viewDimension = WGPUTextureViewDimension_Undefined;*/
 
-	binding_layout.buffer.type = WGPUBufferBindingType_Uniform;
-	binding_layout.buffer.minBindingSize = 24 * sizeof(float);
+	binding_layout[0].binding = 0;
+
+	binding_layout[0].visibility = WGPUShaderStage_Fragment;
+
+	binding_layout[0].buffer.type = WGPUBufferBindingType_Uniform;
+	binding_layout[0].buffer.minBindingSize = 25 * sizeof(float);
+
+
+
+	binding_layout[1].buffer.nextInChain = NULL;
+	binding_layout[1].buffer.type = WGPUBufferBindingType_Undefined;
+	binding_layout[1].buffer.hasDynamicOffset = false;
+
+/*	binding_layout[1].sampler.nextInChain = NULL;
+	binding_layout[1].sampler.type = WGPUSamplerBindingType_Undefined;
+
+	binding_layout[1].storageTexture.nextInChain = NULL;
+	binding_layout[1].storageTexture.access = WGPUStorageTextureAccess_Undefined;
+	binding_layout[1].storageTexture.format = WGPUTextureFormat_Undefined;
+	binding_layout[1].storageTexture.viewDimension = WGPUTextureViewDimension_Undefined;
+
+	binding_layout[1].texture.nextInChain = NULL;
+	binding_layout[1].texture.multisampled = false;
+	binding_layout[1].texture.sampleType = WGPUTextureSampleType_Undefined;
+	binding_layout[1].texture.viewDimension = WGPUTextureViewDimension_Undefined;*/
+
+	binding_layout[1].binding = 1;
+
+	binding_layout[1].visibility = WGPUShaderStage_Fragment;
+
+	binding_layout[1].buffer.type = WGPUBufferBindingType_Storage;
+	binding_layout[1].buffer.minBindingSize = 800 * 600 * 4 *  sizeof(float);
 
 	WGPUBindGroupLayoutDescriptor bind_group_lay_desc = {0};
 	bind_group_lay_desc.nextInChain = NULL;
-	bind_group_lay_desc.entryCount = 1;
-	bind_group_lay_desc.entries = &binding_layout;
+	bind_group_lay_desc.entryCount = 2;
+	bind_group_lay_desc.entries = binding_layout;
 	state->bind_group_layout = wgpuDeviceCreateBindGroupLayout(state->device, &bind_group_lay_desc);
 
 	WGPUPipelineLayoutDescriptor layout_desc = {0};
@@ -810,7 +865,13 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	binding[0].binding = 0;
 	binding[0].buffer = state->resolution_buffer;
 	binding[0].offset = 0;
-	binding[0].size = 24 * sizeof(float);
+	binding[0].size = 25 * sizeof(float);
+
+	binding[1].nextInChain = NULL;
+	binding[1].binding = 1;
+	binding[1].buffer = state->screen_buffer;
+	binding[1].offset = 0;
+	binding[1].size = 800 * 600 * 4 * sizeof(float);
 
 
 
@@ -818,7 +879,7 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 	bind_group_desc.nextInChain = NULL;
 	bind_group_desc.layout = state->bind_group_layout;
 
-	bind_group_desc.entryCount = 1;
+	bind_group_desc.entryCount = 2;
 	bind_group_desc.entries = binding;
 	state->bind_group = wgpuDeviceCreateBindGroup(state->device, &bind_group_desc);
 
@@ -1240,13 +1301,17 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	struct {
 		mat4 a;
 		vec4 pos;
-		vec4 b;
+		float x;
+		float y;
+		uint32_t frameNum;
 	} uniform_data;
 
 	mat4 rot_matrix = gen_rotation_matrix(state->cam_yaw, state->cam_pitch, 0);
 	uniform_data.a = rot_matrix;
-	uniform_data.b = (vec4){WIDTH, HEIGHT, 0, 0};
 	uniform_data.pos = state->cam_pos;
+	uniform_data.x = WIDTH;
+	uniform_data.y = HEIGHT;
+	uniform_data.frameNum = state->frame_accumulation_count++;
 
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 0, &uniform_data, sizeof(uniform_data));
 	
