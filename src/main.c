@@ -687,8 +687,8 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			var randAngle : f32 = hash() * 3.14159*2;
 			var randInCirc : vec2f = vec2f(cos(randAngle), sin(randAngle)) * sqrt(hash());
 
-			var ndcX : f32 = ((pos.x + randInCirc.x) / uData.resolution.x - 0.5) * 2.0;
-			var ndcY : f32 = ((pos.y + randInCirc.y) / uData.resolution.y - 0.5) * 2.0;
+			var ndcX : f32 = ((pos.x + randInCirc.x/2) / uData.resolution.x - 0.5) * 2.0;
+			var ndcY : f32 = ((pos.y + randInCirc.y/2) / uData.resolution.y - 0.5) * 2.0;
 			
 			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f((ndcX) * aspectRatio, ndcY, 1.0)), 0.0);
 
@@ -796,7 +796,7 @@ screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3]
 	wgpuQueueWriteBuffer(state->queue, state->resolution_buffer, 20 * sizeof(float), (float[]){WIDTH, HEIGHT}, sizeof(float)*2);
 
 	WGPUBufferDescriptor screen_buf_desc = {0};
-	screen_buf_desc.size = 800 * 600 * 4 * sizeof(float);
+	screen_buf_desc.size = WIDTH * HEIGHT * 4 * sizeof(float);
 	screen_buf_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage;
 	screen_buf_desc.mappedAtCreation = false;
 
@@ -851,7 +851,7 @@ screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3]
 	binding_layout[1].visibility = WGPUShaderStage_Fragment;
 
 	binding_layout[1].buffer.type = WGPUBufferBindingType_Storage;
-	binding_layout[1].buffer.minBindingSize = 800 * 600 * 4 *  sizeof(float);
+	binding_layout[1].buffer.minBindingSize = WIDTH * HEIGHT * 4 *  sizeof(float);
 
 	WGPUBindGroupLayoutDescriptor bind_group_lay_desc = {0};
 	bind_group_lay_desc.nextInChain = NULL;
@@ -876,7 +876,7 @@ screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3]
 	binding[1].binding = 1;
 	binding[1].buffer = state->screen_buffer;
 	binding[1].offset = 0;
-	binding[1].size = 800 * 600 * 4 * sizeof(float);
+	binding[1].size = WIDTH * HEIGHT * 4 * sizeof(float);
 
 
 
