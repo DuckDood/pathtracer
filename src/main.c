@@ -454,9 +454,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 0, 0),
 				vec3(0,0,0),
-				vec3(0,0,0),
+				vec3(1,1,1),
 				0,
-				0
+				0.1
 			)
 		),
 
@@ -467,9 +467,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 0, 0),
 				vec3(0,0,0),
-				vec3(0,0,0),
+				vec3(1,1,1),
 				0,
-				0
+				0.1
 			)
 		),
 
@@ -482,8 +482,8 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(0, 1, 0),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
+				vec3(1,1,1),
+				2,
 				0
 			)
 		),
@@ -495,8 +495,8 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(0, 1, 0),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
+				vec3(1,1,1),
+				2,
 				0
 			)
 		),
@@ -536,9 +536,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
-				0
+				vec3(1,1,1),
+				0.8,
+				1
 			)
 		),
 
@@ -549,9 +549,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
-				0
+				vec3(1,1,1),
+				0.8,
+				1
 			)
 		),
 
@@ -563,9 +563,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
-				0
+				vec3(1,1,1),
+				1,
+				0.5
 			)
 		),
 
@@ -576,9 +576,9 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 			material(
 				vec3(1, 1, 1),
 				vec3(0,0,0),
-				vec3(0,0,0),
-				0,
-				0
+				vec3(1,1,1),
+				1,
+				0.5
 			)
 
 		),
@@ -683,9 +683,14 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
 			rngSeed = u32(pos.x  + pos.y * 2308) + uData.frameNum * 52342;
 			var aspectRatio : f32 = uData.resolution.x / uData.resolution.y;
-			var ndcX : f32 = (pos.x / uData.resolution.x - 0.5) * 2.0;
-			var ndcY : f32 = (pos.y / uData.resolution.y - 0.5) * 2.0;
-			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f(ndcX * aspectRatio, ndcY, 1.0)), 0.0);
+
+			var randAngle : f32 = hash() * 3.14159*2;
+			var randInCirc : vec2f = vec2f(cos(randAngle), sin(randAngle)) * sqrt(hash());
+
+			var ndcX : f32 = ((pos.x + randInCirc.x) / uData.resolution.x - 0.5) * 2.0;
+			var ndcY : f32 = ((pos.y + randInCirc.y) / uData.resolution.y - 0.5) * 2.0;
+			
+			var rayDir : vec4f = uData.camMatrix * vec4f(normalize(vec3f((ndcX) * aspectRatio, ndcY, 1.0)), 0.0);
 
 			var r: ray;
 			r.origin = uData.camPos;
@@ -702,7 +707,7 @@ fn ray_tri_intersection(r : ray, tri : tri) -> hitInfo {
 		    	//return vec4f(0,0,0, 1);
 		    	return vec4f(sample_env_light(r.direction.xyz), 1);
 			}*/
-			const raysPerPixel : u32 = 10;
+			const raysPerPixel : u32 = 2;
 			var finalColor : vec4f = vec4f(0);
 			for(var i : u32; i < raysPerPixel; i++) {
 				finalColor += vec4f(trace(r), 1.0) / f32(raysPerPixel);
@@ -889,7 +894,8 @@ screenBuffer[(u32(pos.x) + u32(pos.y) * u32(uData.resolution.x)) * 4 + 3]
 	state->pipeline = wgpuDeviceCreateRenderPipeline(state->device, &render_pipe_desc);
 	wgpuShaderModuleRelease(shader_module);
 
-	state->cam_yaw = 0;
+	state->cam_yaw = M_PI;
+	state->cam_pos[2] = 2;
 	state->cam_pitch = 0;
 
 
@@ -905,9 +911,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 			break;
 		case SDL_EVENT_KEY_DOWN:
 			switch(event->key.key) {
-				case SDLK_P:
-					SDL_SavePNG(SDL_GetWindowSurface(state->window), "screenshot.png");
-
 				case SDLK_C:
 					printf("{%f, %f, %f}, %f, %f", state->cam_pos[0], state->cam_pos[1], state->cam_pos[2], state->cam_yaw, state->cam_pitch);
 					break;
