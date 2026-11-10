@@ -7,7 +7,7 @@ This is a simple GPU pathtracer written in C, SDL, and WebGPU that trace a simpl
 ## Trying it out (old)
 You can try out an old CPU version of this pathtracer [here](https://duckdood.github.io/terra/pathtracer), but it doesn't run that well and it only supports spheres.
 
-There is a demo video [here](https://duckdood.github.io/terra/pathtracer_new), but I wasn't able to get an emscripten build up and running.
+There is a newer GPU demo video [here](https://duckdood.github.io/terra/pathtracer_new), but I wasn't able to get an emscripten build up and running.
 
 ## Building locally (tested with GCC)
 ```
