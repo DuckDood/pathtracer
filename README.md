@@ -2,7 +2,7 @@
 
 This is a simple GPU pathtracer written in C, SDL, and WebGPU that trace a simple scenes with small numbers of triangles.
 
-![screenshot of spheres](screenshots/metallic_diffuse.png)
+![screenshot of spheres](screenshots/box.png)
 
 ## Building locally (tested with GCC)
 ```
@@ -10,6 +10,9 @@ git clone https://github.com/DuckDood/pathtracer.git
 cd pathtracer
 make
 ```
+
+This needs a webgpu/webgpu.h header installed, and SDL3.
+
 This puts a `pathtrace` binary in the build/ directory.
 
 ## Credits
