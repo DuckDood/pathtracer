@@ -1085,6 +1085,24 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 		state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
 		state->frame_accumulation_count = 0;
 	}
+	if(kbd_state[SDL_SCANCODE_A]) {
+		//state->cam_pos[2] += 0.01;
+		state->cam_pos[0] -= cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] += sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+
+
+		state->frame_accumulation_count = 0;
+	}
+
+	if(kbd_state[SDL_SCANCODE_D]) {
+		//state->cam_pos[2] -= 0.01;
+		//
+		state->cam_pos[0] += cos(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+		state->cam_pos[2] -= sin(state->cam_yaw)* 0.1 * cos(state->cam_pitch);
+
+		//state->cam_pos[1] += sin(state->cam_pitch) * 0.1;
+		state->frame_accumulation_count = 0;
+	}
 
 
 	const tri tris[12] = {
